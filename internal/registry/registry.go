@@ -189,6 +189,11 @@ func (r *Registry) Search(slug, query string, limit int) (SearchResult, bool) {
 	}, true
 }
 
+// DefaultInterval reports the registry's configured default sync interval.
+func (r *Registry) DefaultInterval() time.Duration {
+	return r.opts.Interval
+}
+
 // Healthy is true once every running server has loaded an index, and true
 // with no servers at all, so an unconfigured container passes its healthcheck.
 func (r *Registry) Healthy() bool {

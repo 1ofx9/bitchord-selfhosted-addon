@@ -2,8 +2,10 @@ package setup
 
 import (
 	"cmp"
+	"fmt"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/rairulyle/bitchord-selfhosted-addon/internal/media"
 	"github.com/rairulyle/bitchord-selfhosted-addon/internal/registry"
@@ -62,22 +64,23 @@ func kindName(kind store.Kind) string {
 }
 
 type serverCard struct {
-	Slug         string
-	Name         string
-	Kind         string
-	Host         string
-	Library      string
-	URL          string
-	MaskedURL    string
-	SyncURL      string
-	SyncInterval string
-	Account      string
-	Auth         store.Auth
-	Enabled      bool
-	Running      bool
-	Status       registry.Status
-	Checked      string
-	Problems     string
+	Slug          string
+	Name          string
+	Kind          string
+	Host          string
+	Library       string
+	URL           string
+	MaskedURL     string
+	SyncURL       string
+	MaskedSyncURL string
+	SyncInterval  string
+	Account       string
+	Auth          store.Auth
+	Enabled       bool
+	Running       bool
+	Status        registry.Status
+	Checked       string
+	Problems      string
 }
 
 type overviewView struct {
@@ -102,8 +105,9 @@ func (a *app) overviewView(r *http.Request, snapshot store.Snapshot) overviewVie
 			card.URL = snapshot.PublicURL + "/" + server.Slug + "/" + snapshot.Secret
 			card.MaskedURL = snapshot.PublicURL + "/" + server.Slug + "/••••••••••"
 			card.SyncURL = snapshot.PublicURL + "/" + server.Slug + "/" + snapshot.Secret + "/sync"
+			card.MaskedSyncURL = snapshot.PublicURL + "/" + server.Slug + "/••••••••••/sync"
 		}
-		card.SyncInterval = formatInterval(server.SyncInterval)
+		card.SyncInterval = formatInterval(server.SyncInterval, a.Registry.DefaultInterval())
 		if status, ok := a.Registry.Status(server.Slug); ok {
 			card.Running, card.Status, card.Checked = true, status, since(status.Refreshed, now)
 		}
@@ -112,14 +116,32 @@ func (a *app) overviewView(r *http.Request, snapshot store.Snapshot) overviewVie
 	return view
 }
 
-func formatInterval(raw string) string {
+func formatInterval(raw string, defaultInterval time.Duration) string {
+	defStr := formatDuration(defaultInterval)
 	switch raw {
 	case "":
-		return "Default"
+		return fmt.Sprintf("Default (%s)", defStr)
 	case "manual", "0":
 		return "Manual only"
 	default:
 		return "Every " + raw
+	}
+}
+
+func formatDuration(d time.Duration) string {
+	if d <= 0 {
+		return "15m"
+	}
+	hours, minutes := int(d/time.Hour), int(d%time.Hour/time.Minute)
+	switch {
+	case hours == 0 && minutes > 0:
+		return fmt.Sprintf("%dm", minutes)
+	case minutes == 0 && hours > 0:
+		return fmt.Sprintf("%dh", hours)
+	case hours > 0 && minutes > 0:
+		return fmt.Sprintf("%dh%dm", hours, minutes)
+	default:
+		return d.String()
 	}
 }
 
@@ -134,6 +156,7 @@ type serverFormView struct {
 	Library         string
 	LibraryName     string
 	SyncInterval    string
+	DefaultInterval string
 	Account         string
 	Auth            store.Auth
 	Enabled         bool
@@ -144,7 +167,8 @@ type serverFormView struct {
 }
 
 func (a *app) formView(r *http.Request, title string) serverFormView {
-	return serverFormView{page: a.page(r, title), Kind: store.Plex, KindName: "Plex", Enabled: true, ScrobblePercent: 50, Kinds: kindOptions, Action: "/setup/servers", Auth: store.AuthToken}
+	defInterval := formatDuration(a.Registry.DefaultInterval())
+	return serverFormView{page: a.page(r, title), Kind: store.Plex, KindName: "Plex", Enabled: true, ScrobblePercent: 50, DefaultInterval: defInterval, Kinds: kindOptions, Action: "/setup/servers", Auth: store.AuthToken}
 }
 
 func hostOf(raw string) string {

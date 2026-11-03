@@ -39,6 +39,7 @@ type Runtime interface {
 	Apply(snapshot store.Snapshot)
 	Status(slug string) (registry.Status, bool)
 	Refresh(ctx context.Context, slug string) error
+	DefaultInterval() time.Duration
 	Search(slug, query string, limit int) (registry.SearchResult, bool)
 	Probe(ctx context.Context, server store.Server) (registry.Probe, error)
 	PlexPIN(ctx context.Context) (registry.PIN, error)

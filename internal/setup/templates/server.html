@@ -24,7 +24,7 @@
     <legend>Credentials</legend>
     <div class="tabs" role="tablist">
       <button type="button" class="tab active" data-tab="signin" role="tab" aria-selected="true" aria-controls="panel-signin">Sign in</button>
-      <button type="button" class="tab" data-tab="token" role="tab" aria-selected="false" aria-controls="panel-token">Paste a token</button>
+      <button type="button" class="tab" data-tab="token" id="token-tab-btn" role="tab" aria-selected="false" aria-controls="panel-token" {{if eq .Kind "navidrome"}}hidden{{end}}>Paste a token</button>
     </div>
 
     <div class="panel" data-panel="signin" id="panel-signin" role="tabpanel">
@@ -70,7 +70,7 @@
 
   <label>Sync Interval
     <select name="sync_interval" id="sync_interval">
-      <option value="" {{if eq .SyncInterval ""}}selected{{end}}>Default (global setting)</option>
+      <option value="" {{if eq .SyncInterval ""}}selected{{end}}>Default ({{.DefaultInterval}})</option>
       <option value="5m" {{if eq .SyncInterval "5m"}}selected{{end}}>Every 5 minutes</option>
       <option value="15m" {{if eq .SyncInterval "15m"}}selected{{end}}>Every 15 minutes</option>
       <option value="30m" {{if eq .SyncInterval "30m"}}selected{{end}}>Every 30 minutes</option>
@@ -86,7 +86,8 @@
     <legend>Scrobbling</legend>
     <label class="inline"><input type="checkbox" name="scrobble_enabled" id="scrobble_enabled" value="1" {{if ne .ScrobblePercent -1}}checked{{end}}> Enable scrobbling to Navidrome</label>
     <div id="scrobble-percent-group" {{if eq .ScrobblePercent -1}}style="display:none"{{end}}>
-      <label>Scrobble threshold: <output id="scrobble-val">{{if gt .ScrobblePercent 0}}{{.ScrobblePercent}}{{else}}50{{end}}%</output> of track
+      <label>
+        <span>Scrobble threshold: <output id="scrobble-val">{{if gt .ScrobblePercent 0}}{{.ScrobblePercent}}{{else}}50{{end}}%</output> of track</span>
         <input type="range" name="scrobble_percent" id="scrobble_percent" min="10" max="90" step="5" value="{{if gt .ScrobblePercent 0}}{{.ScrobblePercent}}{{else}}50{{end}}">
       </label>
       <p class="hint">How much of a track you must listen to before Navidrome registers a completed play. Default is 50%.</p>
@@ -120,6 +121,14 @@
     document.getElementById('token-label').textContent = tokenLabels[k];
     document.getElementById('url').placeholder = urlPlaceholders[k];
     form.querySelectorAll('[data-kind-panel]').forEach(function (el) { el.hidden = el.dataset.kindPanel !== k; });
+    var tokenTab = document.getElementById('token-tab-btn');
+    if (tokenTab) {
+      tokenTab.hidden = (k === 'navidrome');
+      if (k === 'navidrome') {
+        var signinTab = form.querySelector('.tab[data-tab="signin"]');
+        if (signinTab) signinTab.click();
+      }
+    }
   }
   form.querySelectorAll('input[name=kind]').forEach(function (radio) { radio.addEventListener('change', showKind); });
   showKind();

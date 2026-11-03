@@ -367,6 +367,12 @@ func TestServerLifecycleThroughTheForms(t *testing.T) {
 	if !strings.Contains(a.get("/setup").Body.String(), "Sync Webhook") {
 		t.Fatal("overview lacks Sync Webhook")
 	}
+	if !strings.Contains(a.get("/setup").Body.String(), "••••••••••/sync") {
+		t.Fatal("overview lacks masked sync webhook URL")
+	}
+	if !strings.Contains(a.get("/setup").Body.String(), "Default (1h)") {
+		t.Fatal("overview lacks default sync interval value")
+	}
 	if !strings.Contains(a.get("/setup").Body.String(), "Search tester") {
 		t.Fatal("overview lacks Search tester")
 	}

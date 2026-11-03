@@ -52,9 +52,9 @@
       {{else}}Building the index{{end}}
     </dd>
     <dt>BitChord URL</dt>
-    <dd class="row">{{if .URL}}<code class="url">{{.MaskedURL}}</code> <button type="button" class="copy" data-copy="{{.URL}}" aria-label="Copy the BitChord URL for {{.Name}}">Copy</button>{{else}}Set the public URL first{{end}}</dd>
+    <dd class="row" style="flex-wrap: nowrap;">{{if .URL}}<code class="url" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{.MaskedURL}}</code> <button type="button" class="copy" data-copy="{{.URL}}" style="flex-shrink: 0;" aria-label="Copy the BitChord URL for {{.Name}}">Copy</button>{{else}}Set the public URL first{{end}}</dd>
     <dt>Sync Webhook</dt>
-    <dd class="row">{{if .SyncURL}}<code class="url">{{.SyncURL}}</code> <button type="button" class="copy" data-copy="{{.SyncURL}}" aria-label="Copy the Sync Webhook URL for {{.Name}}">Copy</button>{{else}}Set the public URL first{{end}}</dd>
+    <dd class="row" style="flex-wrap: nowrap;">{{if .SyncURL}}<code class="url" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{.MaskedSyncURL}}</code> <button type="button" class="copy" data-copy="{{.SyncURL}}" style="flex-shrink: 0;" aria-label="Copy the Sync Webhook URL for {{.Name}}">Copy</button>{{else}}Set the public URL first{{end}}</dd>
   </dl>
   <div class="row actions">
     <a class="button secondary" href="/setup/servers/{{.Slug}}/edit">Edit</a>

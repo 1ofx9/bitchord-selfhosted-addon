@@ -6,6 +6,16 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-11-04
+
+### Fixed
+
+- Mask the sync webhook URL on the setup overview dashboard (`https://.../<slug>/••••••••••/sync`), preventing secret exposure on screen while keeping full URL copying intact.
+- Keep the "Copy" buttons for BitChord and Sync Webhook URLs aligned horizontally without wrapping onto new lines.
+- Fix Scrobble threshold slider text alignment in the server setup form so "Scrobble threshold: X% of track" renders on a single line.
+- Hide the "Paste a token" tab when Navidrome / Subsonic is selected to avoid confusion, since Subsonic servers authenticate via username and password.
+- Display the configured default duration (e.g. `Default (15m)`) on both the overview dashboard and server form dropdown.
+
 ## [1.3.0] - 2026-11-04
 
 ### Added
