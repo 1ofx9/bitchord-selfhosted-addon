@@ -29,19 +29,22 @@ const (
 // Options configures the client. Username and Password come from the stored
 // "user:password" credential; Navidrome's Subsonic API has no static API key.
 type Options struct {
-	BaseURL       string
-	Username      string
-	Password      string
-	HeaderTimeout time.Duration
-	CallTimeout   time.Duration
-	Log           *slog.Logger
+	BaseURL         string
+	Username        string
+	Password        string
+	ScrobblePercent int
+	HeaderTimeout   time.Duration
+	CallTimeout     time.Duration
+	Log             *slog.Logger
 }
 
 type Client struct {
-	http     *media.Client
-	username string
-	password string
-	log      *slog.Logger
+	http            *media.Client
+	username        string
+	password        string
+	scrobblePercent int
+	tracker         *playbackTracker
+	log             *slog.Logger
 }
 
 // SplitCredential splits the stored credential "user:password"; the first
@@ -60,6 +63,10 @@ func New(o Options) *Client {
 	if o.Log == nil {
 		o.Log = slog.New(slog.DiscardHandler)
 	}
+	percent := o.ScrobblePercent
+	if percent == 0 {
+		percent = 50
+	}
 	return &Client{
 		http: media.NewClient(media.ClientOptions{
 			BaseURL:       strings.TrimRight(o.BaseURL, "/"),
@@ -68,9 +75,11 @@ func New(o Options) *Client {
 			HeaderTimeout: o.HeaderTimeout,
 			CallTimeout:   o.CallTimeout,
 		}),
-		username: o.Username,
-		password: o.Password,
-		log:      o.Log,
+		username:        o.Username,
+		password:        o.Password,
+		scrobblePercent: percent,
+		tracker:         &playbackTracker{},
+		log:             o.Log,
 	}
 }
 
@@ -394,15 +403,9 @@ func (c *Client) OpenFile(ctx context.Context, track media.Track, method string,
 		if header != nil {
 			rng = header.Get("Range")
 		}
-		// Only report playback if starting from the beginning (empty range or bytes=0-)
+		// If playback is starting from the beginning (no Range or bytes=0-)
 		if rng == "" || strings.HasPrefix(rng, "bytes=0-") {
-			go func() {
-				sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-				defer cancel()
-				if err := c.Scrobble(sctx, track.ID, false); err != nil {
-					c.log.Debug("navidrome now playing report failed", "id", track.ID, "error", err)
-				}
-			}()
+			c.startPlayback(track)
 			res.Body = &scrobbleBody{
 				ReadCloser: res.Body,
 				client:     c,
@@ -414,15 +417,94 @@ func (c *Client) OpenFile(ctx context.Context, track media.Track, method string,
 	return res, nil
 }
 
+type playbackTracker struct {
+	mu          sync.Mutex
+	trackID     string
+	startedAt   time.Time
+	durationSec int
+	timer       *time.Timer
+	scrobbled   bool
+}
+
+func (c *Client) startPlayback(track media.Track) {
+	if c.scrobblePercent <= 0 {
+		// Scrobbling disabled, only report "Now Playing"
+		go func() {
+			sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = c.Scrobble(sctx, track.ID, false)
+		}()
+		return
+	}
+
+	c.tracker.mu.Lock()
+	defer c.tracker.mu.Unlock()
+
+	// If the client repeats requests for the same track within 5 seconds
+	// (e.g. metadata probe range request followed by the actual playback stream),
+	// leave the existing playback timer running so it does not reset.
+	if c.tracker.trackID == track.ID && time.Since(c.tracker.startedAt) < 5*time.Second {
+		return
+	}
+
+	// Cancel any existing timer from a previous track. Since that previous track
+	// was switched away before reaching its threshold, it will not be scrobbled!
+	if c.tracker.timer != nil {
+		c.tracker.timer.Stop()
+	}
+
+	c.tracker.trackID = track.ID
+	c.tracker.startedAt = time.Now()
+	c.tracker.durationSec = track.DurationSec
+	c.tracker.scrobbled = false
+
+	// Report "Now Playing" immediately to Navidrome
+	go func() {
+		sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := c.Scrobble(sctx, track.ID, false); err != nil {
+			c.log.Debug("navidrome now playing report failed", "id", track.ID, "error", err)
+		}
+	}()
+
+	// Calculate needed listen duration in seconds: (duration * percent) / 100
+	dur := track.DurationSec
+	if dur <= 0 {
+		dur = 180 // default 3 min fallback if track metadata omitted duration
+	}
+	neededSec := float64(dur) * float64(c.scrobblePercent) / 100.0
+	if neededSec > 240 {
+		neededSec = 240 // Subsonic / Last.fm standard max 4 minutes
+	}
+	if neededSec < 15 {
+		neededSec = 15 // minimum 15s to prevent immediate scrobble on very short tracks
+	}
+
+	trackID := track.ID
+	c.tracker.timer = time.AfterFunc(time.Duration(neededSec)*time.Second, func() {
+		c.tracker.mu.Lock()
+		defer c.tracker.mu.Unlock()
+		if c.tracker.trackID == trackID && !c.tracker.scrobbled {
+			c.tracker.scrobbled = true
+			go func() {
+				sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				if err := c.Scrobble(sctx, trackID, true); err != nil {
+					c.log.Debug("navidrome scrobble report failed", "id", trackID, "error", err)
+				}
+			}()
+		}
+	})
+}
+
 type scrobbleBody struct {
 	io.ReadCloser
-	client    *Client
-	trackID   string
-	total     int64
-	read      int64
-	hitEOF    bool
-	scrobbled bool
-	mu        sync.Mutex
+	client  *Client
+	trackID string
+	total   int64
+	read    int64
+	hitEOF  bool
+	mu      sync.Mutex
 }
 
 func (s *scrobbleBody) Read(p []byte) (int, error) {
@@ -438,18 +520,22 @@ func (s *scrobbleBody) Read(p []byte) (int, error) {
 
 func (s *scrobbleBody) Close() error {
 	s.mu.Lock()
-	shouldScrobble := !s.scrobbled && (s.hitEOF || (s.total > 0 && s.read*2 >= s.total))
-	s.scrobbled = true
+	read := s.read
+	total := s.total
+	hitEOF := s.hitEOF
 	s.mu.Unlock()
 
-	if shouldScrobble {
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			if err := s.client.Scrobble(ctx, s.trackID, true); err != nil {
-				s.client.log.Debug("navidrome scrobble report failed", "id", s.trackID, "error", err)
+	// If the client aborted the stream before reading at least 50% of the stream bytes
+	// and without reaching EOF (e.g. user closed BitChord or skipped while buffering),
+	// immediately cancel the playback timer so it will never scrobble!
+	if total > 0 && read*2 < total && !hitEOF {
+		s.client.tracker.mu.Lock()
+		if s.client.tracker.trackID == s.trackID && !s.client.tracker.scrobbled {
+			if s.client.tracker.timer != nil {
+				s.client.tracker.timer.Stop()
 			}
-		}()
+		}
+		s.client.tracker.mu.Unlock()
 	}
 	return s.ReadCloser.Close()
 }

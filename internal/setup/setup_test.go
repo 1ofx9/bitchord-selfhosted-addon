@@ -610,7 +610,7 @@ func TestNavidromeSignInStoresTheTokenAndNeverThePassword(t *testing.T) {
 		t.Fatalf("save: %d %s", rec.Code, rec.Body.String())
 	}
 	server, _ := a.store.Snapshot().Server("navidrome-1")
-	if server.Token != fakes.NavidromeToken || server.Auth != store.AuthNavidromeSignIn || server.Account != fakes.NavidromeUser || server.Library != fakes.NavidromeMusicFolder {
+	if server.Token != fakes.NavidromeToken || server.Auth != store.AuthNavidromeSignIn || server.Account != fakes.NavidromeUser || server.Library != fakes.NavidromeMusicFolder || server.ScrobblePercent != 50 {
 		t.Fatalf("stored = %+v", server)
 	}
 	moved := a.form("/setup/servers/navidrome-1", url.Values{"label": {"NAS"}, "url": {fakes.NewNavidrome(t).URL}, "enabled": {"1"}})

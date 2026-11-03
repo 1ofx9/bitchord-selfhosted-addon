@@ -209,30 +209,42 @@ func (a *app) editServerForm(w http.ResponseWriter, r *http.Request) {
 	view := a.formView(r, "Edit "+registry.DisplayName(kindName(server.Kind), server.Label))
 	view.Editing, view.Slug, view.Kind, view.KindName = true, server.Slug, server.Kind, kindName(server.Kind)
 	view.Label, view.URL, view.Library, view.LibraryName, view.Account, view.Auth, view.Enabled = server.Label, server.URL, server.Library, server.LibraryName, server.Account, server.Auth, server.Enabled
+	view.ScrobblePercent = server.ScrobblePercent
 	view.Action = "/setup/servers/" + server.Slug
 	a.render(w, r, http.StatusOK, "server", view)
 }
 
 // submitted is what the form posts, before any of it has been checked.
 type submitted struct {
-	kind     store.Kind
-	label    string
-	url      string
-	token    string
-	tokenRef string
-	library  string
-	enabled  bool
+	kind            store.Kind
+	label           string
+	url             string
+	token           string
+	tokenRef        string
+	library         string
+	enabled         bool
+	scrobblePercent int
 }
 
 func readSubmitted(r *http.Request) submitted {
+	scrobblePercent := 50
+	if raw := r.PostFormValue("scrobble_percent"); raw != "" {
+		if p, err := strconv.Atoi(raw); err == nil && p >= 10 && p <= 90 {
+			scrobblePercent = p
+		}
+		if r.PostFormValue("scrobble_enabled") == "" {
+			scrobblePercent = -1 // checkbox was explicitly unchecked
+		}
+	}
 	return submitted{
-		kind:     store.Kind(r.PostFormValue("kind")),
-		label:    strings.TrimSpace(r.PostFormValue("label")),
-		url:      strings.TrimRight(strings.TrimSpace(r.PostFormValue("url")), "/"),
-		token:    strings.TrimSpace(r.PostFormValue("token")),
-		tokenRef: r.PostFormValue("token_ref"),
-		library:  r.PostFormValue("library"),
-		enabled:  r.PostFormValue("enabled") != "",
+		kind:            store.Kind(r.PostFormValue("kind")),
+		label:           strings.TrimSpace(r.PostFormValue("label")),
+		url:             strings.TrimRight(strings.TrimSpace(r.PostFormValue("url")), "/"),
+		token:           strings.TrimSpace(r.PostFormValue("token")),
+		tokenRef:        r.PostFormValue("token_ref"),
+		library:         r.PostFormValue("library"),
+		enabled:         r.PostFormValue("enabled") != "",
+		scrobblePercent: scrobblePercent,
 	}
 }
 
@@ -303,6 +315,9 @@ func (a *app) resolveServer(ctx context.Context, form submitted, existing store.
 	}()
 	server = existing
 	server.Label, server.URL, server.Enabled = form.label, form.url, form.enabled
+	if form.kind == store.Navidrome {
+		server.ScrobblePercent = form.scrobblePercent
+	}
 	if err = store.ValidateServerURL(server.URL); err != nil {
 		return server, giveBack, err
 	}
@@ -354,6 +369,7 @@ func (a *app) resolveServer(ctx context.Context, form submitted, existing store.
 func (a *app) renderServerError(w http.ResponseWriter, r *http.Request, view serverFormView, form submitted, err error) {
 	view.Error = err.Error()
 	view.Kind, view.KindName, view.Label, view.URL, view.Library, view.Enabled = form.kind, kindName(form.kind), form.label, form.url, form.library, form.enabled
+	view.ScrobblePercent = form.scrobblePercent
 	a.render(w, r, http.StatusBadRequest, "server", view)
 }
 

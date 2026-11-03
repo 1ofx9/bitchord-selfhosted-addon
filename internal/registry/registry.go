@@ -135,7 +135,7 @@ func NewBackend(server store.Server, clientID, version string, log *slog.Logger)
 		return jellyfin.New(jellyfin.Options{BaseURL: server.URL, APIKey: server.Token, DeviceID: deviceID, Version: version}), nil
 	case store.Navidrome:
 		username, password := subsonic.SplitCredential(server.Token)
-		return subsonic.New(subsonic.Options{BaseURL: server.URL, Username: username, Password: password, Log: log}), nil
+		return subsonic.New(subsonic.Options{BaseURL: server.URL, Username: username, Password: password, ScrobblePercent: server.ScrobblePercent, Log: log}), nil
 	default:
 		return nil, fmt.Errorf("unknown server kind %q", server.Kind)
 	}

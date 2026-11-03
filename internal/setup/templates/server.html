@@ -68,6 +68,17 @@
   </label>
   <p class="hint">Test the connection to list the server's music libraries.</p>
 
+  <fieldset data-kind-panel="navidrome" {{if ne .Kind "navidrome"}}hidden{{end}}>
+    <legend>Scrobbling</legend>
+    <label class="inline"><input type="checkbox" name="scrobble_enabled" id="scrobble_enabled" value="1" {{if ne .ScrobblePercent -1}}checked{{end}}> Enable scrobbling to Navidrome</label>
+    <div id="scrobble-percent-group" {{if eq .ScrobblePercent -1}}style="display:none"{{end}}>
+      <label>Scrobble threshold: <output id="scrobble-val">{{if gt .ScrobblePercent 0}}{{.ScrobblePercent}}{{else}}50{{end}}%</output> of track
+        <input type="range" name="scrobble_percent" id="scrobble_percent" min="10" max="90" step="5" value="{{if gt .ScrobblePercent 0}}{{.ScrobblePercent}}{{else}}50{{end}}">
+      </label>
+      <p class="hint">How much of a track you must listen to before Navidrome registers a completed play. Default is 50%.</p>
+    </div>
+  </fieldset>
+
   <label class="inline"><input type="checkbox" name="enabled" value="1" {{if .Enabled}}checked{{end}}> Enabled</label>
 
   <div class="row">
@@ -229,6 +240,21 @@
         result.className = 'error';
       });
   });
+
+  var scrobbleEnabled = document.getElementById('scrobble_enabled');
+  var scrobbleSlider = document.getElementById('scrobble_percent');
+  var scrobbleVal = document.getElementById('scrobble-val');
+  var scrobbleGroup = document.getElementById('scrobble-percent-group');
+  if (scrobbleEnabled && scrobbleGroup) {
+    scrobbleEnabled.addEventListener('change', function () {
+      scrobbleGroup.style.display = this.checked ? '' : 'none';
+    });
+  }
+  if (scrobbleSlider && scrobbleVal) {
+    scrobbleSlider.addEventListener('input', function () {
+      scrobbleVal.textContent = this.value + '%';
+    });
+  }
 })();
 </script>
 {{end}}

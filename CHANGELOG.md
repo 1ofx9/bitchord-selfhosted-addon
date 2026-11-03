@@ -6,6 +6,13 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-11-03
+
+### Changed
+
+- Scrobbling threshold for Navidrome: replaces network-based stream completion with real wall-clock playback duration tracking (requiring at least 50% of the track to actually be listened to before scrobbling). Skips, fast buffering, and tracks visited under the threshold are cancelled and never scrobbled.
+- Added a scrobble threshold slider (10%–90%) and disable toggle to the setup page for Navidrome servers.
+
 ## [1.2.2] - 2026-11-03
 
 ### Added

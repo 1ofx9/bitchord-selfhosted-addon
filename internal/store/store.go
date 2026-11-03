@@ -42,18 +42,19 @@ const (
 )
 
 type Server struct {
-	Slug        string    `json:"slug"`
-	Label       string    `json:"label"`
-	Kind        Kind      `json:"kind"`
-	URL         string    `json:"url"`
-	Token       string    `json:"token"`
-	Auth        Auth      `json:"auth"`
-	Account     string    `json:"account"`
-	DeviceID    string    `json:"device_id,omitempty"`
-	Library     string    `json:"library"`
-	LibraryName string    `json:"library_name,omitempty"`
-	Enabled     bool      `json:"enabled"`
-	Created     time.Time `json:"created"`
+	Slug            string    `json:"slug"`
+	Label           string    `json:"label"`
+	Kind            Kind      `json:"kind"`
+	URL             string    `json:"url"`
+	Token           string    `json:"token"`
+	Auth            Auth      `json:"auth"`
+	Account         string    `json:"account"`
+	DeviceID        string    `json:"device_id,omitempty"`
+	Library         string    `json:"library"`
+	LibraryName     string    `json:"library_name,omitempty"`
+	ScrobblePercent int       `json:"scrobble_percent,omitempty"`
+	Enabled         bool      `json:"enabled"`
+	Created         time.Time `json:"created"`
 }
 
 type Admin struct {
@@ -226,7 +227,8 @@ func (s *Store) EnsureNavidrome(url, credential, account string) (bool, error) {
 		server := Server{
 			Kind: Navidrome, URL: url, Token: credential,
 			Auth: AuthNavidromeSignIn, Account: account, Enabled: true,
-			Created: time.Now().UTC().Truncate(time.Second),
+			ScrobblePercent: 50,
+			Created:         time.Now().UTC().Truncate(time.Second),
 		}
 		server.Slug = nextSlug(server.Kind, data.Servers)
 		data.Servers = append(data.Servers, server)

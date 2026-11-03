@@ -266,19 +266,18 @@ func TestScrobble(t *testing.T) {
 	}
 }
 
-func TestOpenFileTriggersScrobble(t *testing.T) {
+func TestOpenFileNowPlayingAndSkipping(t *testing.T) {
 	fake := fakes.NewNavidrome(t)
 	c := newClient(fake)
-	track := media.Track{ID: "s-1", FileRef: StreamPath("s-1")}
+	track := media.Track{ID: "s-1", FileRef: StreamPath("s-1"), DurationSec: 180}
 	res, err := c.OpenFile(context.Background(), track, http.MethodGet, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Read entire body to EOF so scrobbleBody triggers completion scrobble
 	_, _ = io.ReadAll(res.Body)
 	_ = res.Body.Close()
 
-	// Wait briefly for background goroutines to complete
+	// Wait briefly for background Now Playing goroutine
 	time.Sleep(50 * time.Millisecond)
 
 	var scrobbles []fakes.Request
@@ -287,7 +286,33 @@ func TestOpenFileTriggersScrobble(t *testing.T) {
 			scrobbles = append(scrobbles, req)
 		}
 	}
-	if len(scrobbles) < 2 {
-		t.Fatalf("expected at least 2 scrobbles (now playing + completed), got %d", len(scrobbles))
+	// Exactly 1 scrobble (now playing), NO completed scrobble because elapsed time was only 50ms
+	if len(scrobbles) != 1 {
+		t.Fatalf("expected exactly 1 scrobble (now playing), got %d: %+v", len(scrobbles), scrobbles)
+	}
+	if !strings.Contains(scrobbles[0].Query, "submission=false") {
+		t.Errorf("scrobble query = %q, want submission=false", scrobbles[0].Query)
+	}
+
+	// Now start a second track - should cancel any pending timer for s-1
+	track2 := media.Track{ID: "s-2", FileRef: StreamPath("s-2"), DurationSec: 180}
+	res2, err := c.OpenFile(context.Background(), track2, http.MethodGet, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res2.Body.Close()
+	time.Sleep(50 * time.Millisecond)
+
+	var scrobblesAfter []fakes.Request
+	for _, req := range fake.Requests() {
+		if req.Path == "/rest/scrobble.view" {
+			scrobblesAfter = append(scrobblesAfter, req)
+		}
+	}
+	// Still only Now Playing requests (s-1 now playing, s-2 now playing), no completed scrobbles
+	for _, req := range scrobblesAfter {
+		if strings.Contains(req.Query, "submission=true") {
+			t.Fatalf("unexpected completed scrobble for skipped track: %s", req.Query)
+		}
 	}
 }

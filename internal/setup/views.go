@@ -102,24 +102,25 @@ func (a *app) overviewView(r *http.Request, snapshot store.Snapshot) overviewVie
 
 type serverFormView struct {
 	page
-	Editing     bool
-	Slug        string
-	Kind        store.Kind
-	KindName    string
-	Label       string
-	URL         string
-	Library     string
-	LibraryName string
-	Account     string
-	Auth        store.Auth
-	Enabled     bool
-	Libraries   []media.Library
-	Kinds       []kindOption
-	Action      string
+	Editing         bool
+	Slug            string
+	Kind            store.Kind
+	KindName        string
+	Label           string
+	URL             string
+	Library         string
+	LibraryName     string
+	Account         string
+	Auth            store.Auth
+	Enabled         bool
+	ScrobblePercent int
+	Libraries       []media.Library
+	Kinds           []kindOption
+	Action          string
 }
 
 func (a *app) formView(r *http.Request, title string) serverFormView {
-	return serverFormView{page: a.page(r, title), Kind: store.Plex, KindName: "Plex", Enabled: true, Kinds: kindOptions, Action: "/setup/servers", Auth: store.AuthToken}
+	return serverFormView{page: a.page(r, title), Kind: store.Plex, KindName: "Plex", Enabled: true, ScrobblePercent: 50, Kinds: kindOptions, Action: "/setup/servers", Auth: store.AuthToken}
 }
 
 func hostOf(raw string) string {
