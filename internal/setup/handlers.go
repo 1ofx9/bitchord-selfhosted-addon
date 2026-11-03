@@ -411,6 +411,23 @@ func (a *app) setServerEnabled(w http.ResponseWriter, r *http.Request) {
 	redirectNotice(w, r, slug+" "+map[bool]string{true: "enabled", false: "disabled"}[enabled]+".")
 }
 
+func (a *app) refreshServer(w http.ResponseWriter, r *http.Request) {
+	slug := r.PathValue("slug")
+	server, ok := a.Store.Snapshot().Server(slug)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+	defer cancel()
+	name := registry.DisplayName(kindName(server.Kind), server.Label)
+	if err := a.Registry.Refresh(ctx, slug); err != nil {
+		redirectNotice(w, r, fmt.Sprintf("Sync failed for %s: %s", name, err.Error()))
+		return
+	}
+	redirectNotice(w, r, name+" synced.")
+}
+
 // ---- JSON endpoints used by the form's buttons
 
 type testRequest struct {

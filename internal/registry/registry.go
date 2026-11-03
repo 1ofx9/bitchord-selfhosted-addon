@@ -157,6 +157,15 @@ func (r *Registry) Status(slug string) (Status, bool) {
 	return Status{Ready: entry.Library.Ready(), Tracks: stats.Tracks, Refreshed: stats.Refreshed, LastError: stats.LastError}, true
 }
 
+// Refresh triggers an immediate library sync for the server named by slug.
+func (r *Registry) Refresh(ctx context.Context, slug string) error {
+	entry, ok := r.Lookup(slug)
+	if !ok {
+		return fmt.Errorf("server %q is not running", slug)
+	}
+	return entry.Library.Refresh(ctx)
+}
+
 // Healthy is true once every running server has loaded an index, and true
 // with no servers at all, so an unconfigured container passes its healthcheck.
 func (r *Registry) Healthy() bool {

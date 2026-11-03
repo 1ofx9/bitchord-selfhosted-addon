@@ -6,6 +6,12 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ## [Unreleased]
 
+## [1.2.4] - 2026-11-04
+
+### Added
+
+- On-demand library synchronization. Running servers on the setup dashboard now have a "Sync now" button to immediately trigger a full library refresh without waiting for the background sync interval or restarting the container.
+
 ## [1.2.3] - 2026-11-03
 
 ### Changed

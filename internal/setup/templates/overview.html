@@ -55,6 +55,12 @@
   </dl>
   <div class="row actions">
     <a class="button secondary" href="/setup/servers/{{.Slug}}/edit">Edit</a>
+    {{if and .Enabled .Running}}
+    <form method="post" action="/setup/servers/{{.Slug}}/refresh">
+      <input type="hidden" name="csrf" value="{{$.CSRF}}">
+      <button class="secondary">Sync now</button>
+    </form>
+    {{end}}
     <form method="post" action="/setup/servers/{{.Slug}}/enabled">
       <input type="hidden" name="csrf" value="{{$.CSRF}}">
       <input type="hidden" name="enabled" value="{{if .Enabled}}false{{else}}true{{end}}">

@@ -361,6 +361,12 @@ func TestServerLifecycleThroughTheForms(t *testing.T) {
 	if rec := a.get("/setup"); !strings.Contains(rec.Body.String(), "5 tracks") || !strings.Contains(rec.Body.String(), "<dt>Library</dt><dd>Music</dd>") {
 		t.Fatalf("overview lacks the track count or the library name:\n%s", rec.Body.String())
 	}
+	if !strings.Contains(a.get("/setup").Body.String(), "Sync now") {
+		t.Fatal("overview lacks Sync now button")
+	}
+	if rec := a.form("/setup/servers/plex-1/refresh", url.Values{}); rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "synced") {
+		t.Fatalf("refresh: %d %s", rec.Code, rec.Header().Get("Location"))
+	}
 
 	edit := a.get("/setup/servers/plex-1/edit")
 	if edit.Code != http.StatusOK || !strings.Contains(edit.Body.String(), `value="Home"`) || !strings.Contains(edit.Body.String(), "leave empty to keep") || !strings.Contains(edit.Body.String(), `<option value="3" selected>Music</option>`) {
@@ -404,6 +410,12 @@ func TestServerLifecycleThroughTheForms(t *testing.T) {
 	if server, _ := a.store.Snapshot().Server(slug); server.Enabled {
 		t.Fatal("disabled flag not stored")
 	}
+	if strings.Contains(a.get("/setup").Body.String(), `action="/setup/servers/plex-1/refresh"`) {
+		t.Fatal("disabled server still has Sync now button")
+	}
+	if rec := a.form("/setup/servers/plex-1/refresh", url.Values{}); rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "Sync+failed") {
+		t.Fatalf("refresh disabled server: %d %s", rec.Code, rec.Header().Get("Location"))
+	}
 	second := a.addPlex(fakes.NewPlex(t), "")
 	if second != "plex-2" {
 		t.Fatalf("second slug = %q", second)
@@ -419,6 +431,9 @@ func TestServerLifecycleThroughTheForms(t *testing.T) {
 	}
 	if rec := a.form("/setup/servers/plex-9/enabled", url.Values{"enabled": {"false"}}); rec.Code != http.StatusNotFound {
 		t.Fatalf("disable unknown: %d", rec.Code)
+	}
+	if rec := a.form("/setup/servers/plex-9/refresh", url.Values{}); rec.Code != http.StatusNotFound {
+		t.Fatalf("refresh unknown: %d", rec.Code)
 	}
 	if rec := a.get("/setup/servers/plex-9/edit"); rec.Code != http.StatusNotFound {
 		t.Fatalf("edit unknown: %d", rec.Code)

@@ -517,3 +517,18 @@ func TestDisplayNameIsSafeUnderConcurrentRelabel(t *testing.T) {
 	close(stop)
 	<-done
 }
+
+func TestRegistryRefresh(t *testing.T) {
+	fake := fakes.NewPlex(t)
+	r := newRegistry(t, snapshot(plexServer(fake, "plex-1")))
+	waitHealthy(t, r)
+
+	ctx := context.Background()
+	if err := r.Refresh(ctx, "plex-1"); err != nil {
+		t.Fatalf("refresh running server: %v", err)
+	}
+
+	if err := r.Refresh(ctx, "nonexistent"); err == nil {
+		t.Fatal("expected error refreshing nonexistent server, got nil")
+	}
+}
