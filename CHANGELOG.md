@@ -6,6 +6,8 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-03
+
 ### Added
 
 - Navidrome support via the Subsonic API. Add Navidrome servers on the setup page with username and password, or seed one from the environment with `NAVIDROME_URL`, `NAVIDROME_USERNAME` and `NAVIDROME_PASSWORD`.

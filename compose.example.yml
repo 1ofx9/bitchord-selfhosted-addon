@@ -1,6 +1,6 @@
 services:
   bitchord-selfhosted-addon:
-    image: ghcr.io/rairulyle/bitchord-selfhosted-addon:latest
+    image: ghcr.io/1ofx9/bitchord-selfhosted-addon:latest
     ports:
       - "8080:8080"
     volumes:
