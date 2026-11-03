@@ -6,6 +6,13 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-11-03
+
+### Fixed
+
+- Support integer music folder IDs in Subsonic and Navidrome `getMusicFolders` responses. The Subsonic specification defines folder IDs as integers, causing unmarshaling errors when servers returned numeric IDs like `{"id": 0}`. Folder IDs now deserialize flexibly from either JSON numbers or strings.
+- Gracefully handle single-object responses for music folders, albums, and songs from XML-to-JSON Subsonic gateways that omit array brackets for single items.
+
 ## [1.2.0] - 2026-11-03
 
 ### Added
