@@ -532,3 +532,41 @@ func TestRegistryRefresh(t *testing.T) {
 		t.Fatal("expected error refreshing nonexistent server, got nil")
 	}
 }
+
+func TestRegistrySearch(t *testing.T) {
+	fake := fakes.NewPlex(t)
+	r := newRegistry(t, snapshot(plexServer(fake, "plex-1")))
+	waitHealthy(t, r)
+
+	res, ok := r.Search("plex-1", "first song", 10)
+	if !ok {
+		t.Fatal("search returned not ok for running server")
+	}
+	if len(res.Tokens) == 0 {
+		t.Errorf("expected tokens, got none")
+	}
+
+	if _, ok := r.Search("nonexistent", "song", 10); ok {
+		t.Fatal("search returned ok for nonexistent server")
+	}
+}
+
+func TestRegistryServerInterval(t *testing.T) {
+	r := newRegistry(t, snapshot())
+	s := store.Server{}
+	if got := r.serverInterval(s); got != time.Hour {
+		t.Errorf("default interval = %v, want 1h", got)
+	}
+	s.SyncInterval = "30m"
+	if got := r.serverInterval(s); got != 30*time.Minute {
+		t.Errorf("custom interval = %v, want 30m", got)
+	}
+	s.SyncInterval = "manual"
+	if got := r.serverInterval(s); got != 0 {
+		t.Errorf("manual interval = %v, want 0", got)
+	}
+	s.SyncInterval = "0"
+	if got := r.serverInterval(s); got != 0 {
+		t.Errorf("zero interval = %v, want 0", got)
+	}
+}

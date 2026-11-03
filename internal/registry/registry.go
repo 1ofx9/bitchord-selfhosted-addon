@@ -166,6 +166,29 @@ func (r *Registry) Refresh(ctx context.Context, slug string) error {
 	return entry.Library.Refresh(ctx)
 }
 
+type SearchResult struct {
+	Strict   int           `json:"strict"`
+	Fallback int           `json:"fallback"`
+	Tokens   []string      `json:"tokens"`
+	Tracks   []media.Track `json:"tracks"`
+}
+
+// Search queries a server's in-memory index directly for testing and diagnostics.
+func (r *Registry) Search(slug, query string, limit int) (SearchResult, bool) {
+	entry, ok := r.Lookup(slug)
+	if !ok {
+		return SearchResult{}, false
+	}
+	tokens := library.Tokens(query)
+	res := entry.Library.Find(query, limit)
+	return SearchResult{
+		Strict:   res.Strict,
+		Fallback: res.Fallback,
+		Tokens:   tokens,
+		Tracks:   res.Tracks,
+	}, true
+}
+
 // Healthy is true once every running server has loaded an index, and true
 // with no servers at all, so an unconfigured container passes its healthcheck.
 func (r *Registry) Healthy() bool {
@@ -273,7 +296,19 @@ func (e *Entry) setLabel(label string) {
 }
 
 func sameConnection(a, b store.Server) bool {
-	return a.Kind == b.Kind && a.URL == b.URL && a.Token == b.Token && a.DeviceID == b.DeviceID && a.Library == b.Library
+	return a.Kind == b.Kind && a.URL == b.URL && a.Token == b.Token && a.DeviceID == b.DeviceID && a.Library == b.Library && a.SyncInterval == b.SyncInterval
+}
+
+func (r *Registry) serverInterval(server store.Server) time.Duration {
+	if server.SyncInterval == "manual" || server.SyncInterval == "0" {
+		return 0
+	}
+	if server.SyncInterval != "" {
+		if d, err := time.ParseDuration(server.SyncInterval); err == nil && d > 0 {
+			return d
+		}
+	}
+	return r.opts.Interval
 }
 
 func (r *Registry) start(server store.Server) (*Entry, error) {
@@ -285,7 +320,7 @@ func (r *Registry) start(server store.Server) (*Entry, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	entry := &Entry{
 		Slug: server.Slug, Kind: server.Kind, Label: server.Label, Backend: backend,
-		Library: library.NewLibrary(backend, server.Library, r.opts.Interval, log),
+		Library: library.NewLibrary(backend, server.Library, r.serverInterval(server), log),
 		Log:     log, config: server, cancel: cancel, done: make(chan struct{}),
 	}
 	go func() {

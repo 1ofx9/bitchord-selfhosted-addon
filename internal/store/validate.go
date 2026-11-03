@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"time"
 	"unicode/utf8"
 )
 
@@ -95,6 +96,12 @@ func ValidateServer(server Server) error {
 	}
 	if utf8.RuneCountInString(server.Label) > LabelMaxLength {
 		problems = append(problems, fmt.Errorf("label must be at most %d characters", LabelMaxLength))
+	}
+	if server.SyncInterval != "" && server.SyncInterval != "manual" && server.SyncInterval != "0" {
+		d, err := time.ParseDuration(server.SyncInterval)
+		if err != nil || d <= 0 {
+			problems = append(problems, errors.New("sync interval must be a positive duration such as 15m, 1h, or manual"))
+		}
 	}
 	return errors.Join(problems...)
 }

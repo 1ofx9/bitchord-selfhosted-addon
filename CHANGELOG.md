@@ -6,6 +6,15 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-04
+
+### Added
+
+- Automated library sync webhooks (`/{slug}/{secret}/sync`). Sending a POST or GET request to the webhook URL triggers an immediate library sync, allowing integrations with Plex webhooks, Jellyfin webhooks, and post-import scripts.
+- In-browser search & match diagnostic tester on the `/setup` overview page. Test track query tokenization, tier scoring (strict vs fallback), and inspect matched track results directly from the browser.
+- Per-server sync intervals. Configure custom library re-scan schedules per server (5m, 15m, 30m, 1h, 6h, 24h, or manual only) on the server setup page.
+- Explicit Subsonic branding and instructions. Clarified that the Subsonic integration supports any Subsonic / OpenSubsonic compatible server, including Navidrome, Gonic, Lyrion Music Server (LMS), Airsonic, Funkwhale, and Ampache.
+
 ## [1.2.4] - 2026-11-04
 
 ### Added

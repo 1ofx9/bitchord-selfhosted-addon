@@ -39,6 +39,7 @@ type Runtime interface {
 	Apply(snapshot store.Snapshot)
 	Status(slug string) (registry.Status, bool)
 	Refresh(ctx context.Context, slug string) error
+	Search(slug, query string, limit int) (registry.SearchResult, bool)
 	Probe(ctx context.Context, server store.Server) (registry.Probe, error)
 	PlexPIN(ctx context.Context) (registry.PIN, error)
 	PlexClaim(ctx context.Context, id int) (registry.Account, bool, error)
@@ -164,6 +165,7 @@ func (a *app) handler() http.Handler {
 	mux.HandleFunc("POST /setup/servers/{slug}/delete", a.deleteServer)
 	mux.HandleFunc("POST /setup/servers/{slug}/enabled", a.setServerEnabled)
 	mux.HandleFunc("POST /setup/servers/{slug}/refresh", a.refreshServer)
+	mux.HandleFunc("GET /setup/servers/{slug}/test-search", a.testSearch)
 	mux.HandleFunc("POST /setup/plex/pin", a.plexPIN)
 	mux.HandleFunc("GET /setup/plex/pin/{id}", a.plexPoll)
 	mux.HandleFunc("POST /setup/jellyfin/signin", a.jellyfinSignIn)

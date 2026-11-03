@@ -364,6 +364,18 @@ func TestServerLifecycleThroughTheForms(t *testing.T) {
 	if !strings.Contains(a.get("/setup").Body.String(), "Sync now") {
 		t.Fatal("overview lacks Sync now button")
 	}
+	if !strings.Contains(a.get("/setup").Body.String(), "Sync Webhook") {
+		t.Fatal("overview lacks Sync Webhook")
+	}
+	if !strings.Contains(a.get("/setup").Body.String(), "Search tester") {
+		t.Fatal("overview lacks Search tester")
+	}
+	if searchRec := a.get("/setup/servers/plex-1/test-search?q=First+Song"); searchRec.Code != http.StatusOK || !strings.Contains(searchRec.Body.String(), `"ok":true`) {
+		t.Fatalf("test-search failed: %d %s", searchRec.Code, searchRec.Body.String())
+	}
+	if searchRec := a.get("/setup/servers/plex-9/test-search?q=First+Song"); searchRec.Code != http.StatusNotFound {
+		t.Fatalf("test-search unknown server: %d", searchRec.Code)
+	}
 	if rec := a.form("/setup/servers/plex-1/refresh", url.Values{}); rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "synced") {
 		t.Fatalf("refresh: %d %s", rec.Code, rec.Header().Get("Location"))
 	}
@@ -379,12 +391,12 @@ func TestServerLifecycleThroughTheForms(t *testing.T) {
 	if !strings.Contains(a.get("/setup").Body.String(), "<dt>Library</dt><dd>3</dd>") || !strings.Contains(a.get("/setup/servers/plex-1/edit").Body.String(), `<option value="3" selected>3</option>`) {
 		t.Fatal("a server saved without a library name does not fall back to its id")
 	}
-	rec := a.form("/setup/servers/plex-1", url.Values{"label": {"Parents"}, "url": {fake.URL}, "library": {""}, "enabled": {"1"}})
+	rec := a.form("/setup/servers/plex-1", url.Values{"label": {"Parents"}, "url": {fake.URL}, "library": {""}, "enabled": {"1"}, "sync_interval": {"30m"}})
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("edit: %d %s", rec.Code, rec.Body.String())
 	}
 	server, _ = a.store.Snapshot().Server(slug)
-	if server.Label != "Parents" || server.Token != fakes.PlexToken || server.Library != "" {
+	if server.Label != "Parents" || server.Token != fakes.PlexToken || server.Library != "" || server.SyncInterval != "30m" {
 		t.Fatalf("after edit = %+v", server)
 	}
 	if entry, _ := a.reg.Lookup(slug); entry.DisplayName() != "Plex - Parents" {

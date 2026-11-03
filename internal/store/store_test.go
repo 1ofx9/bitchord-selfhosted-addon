@@ -267,6 +267,9 @@ func TestValidation(t *testing.T) {
 		"label too long":       {func(v *Server) { v.Label = strings.Repeat("é", 17) }, "at most 16 characters"},
 		"label at the cap":     {func(v *Server) { v.Label = strings.Repeat("é", 16) }, ""},
 		"empty label":          {func(v *Server) { v.Label = "" }, ""},
+		"valid interval":       {func(v *Server) { v.SyncInterval = "1h" }, ""},
+		"manual interval":      {func(v *Server) { v.SyncInterval = "manual" }, ""},
+		"bad interval":         {func(v *Server) { v.SyncInterval = "soon" }, "sync interval must be a positive duration"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

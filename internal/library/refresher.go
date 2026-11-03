@@ -117,6 +117,10 @@ func (l *Library) Run(ctx context.Context) {
 		}
 		backoff = min(backoff*2, maxBackoff)
 	}
+	if l.interval <= 0 {
+		<-ctx.Done()
+		return
+	}
 	for l.sleep(ctx, l.interval) == nil {
 		if err := l.Refresh(ctx); err != nil && ctx.Err() == nil {
 			l.log.Error("library refresh failed, keeping the previous index", "error", err.Error())

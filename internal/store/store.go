@@ -52,6 +52,7 @@ type Server struct {
 	DeviceID        string    `json:"device_id,omitempty"`
 	Library         string    `json:"library"`
 	LibraryName     string    `json:"library_name,omitempty"`
+	SyncInterval    string    `json:"sync_interval,omitempty"`
 	ScrobblePercent int       `json:"scrobble_percent,omitempty"`
 	Enabled         bool      `json:"enabled"`
 	Created         time.Time `json:"created"`

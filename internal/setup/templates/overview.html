@@ -28,7 +28,7 @@
 
 {{if not .Servers}}
 <section class="card empty">
-  <p>No servers yet. Add a Plex, Jellyfin or Navidrome server to get its BitChord URL.</p>
+  <p>No servers yet. Add a Plex, Jellyfin or Navidrome / Subsonic server to get its BitChord URL.</p>
   <a class="button" href="/setup/servers/new">Add a server</a>
 </section>
 {{else}}
@@ -42,6 +42,7 @@
   <dl>
     <dt>Server</dt><dd>{{.Host}}{{if .Account}} · signed in as {{.Account}}{{end}}</dd>
     <dt>Library</dt><dd>{{.Library}}</dd>
+    <dt>Sync Interval</dt><dd>{{.SyncInterval}}</dd>
     <dt>Status</dt>
     <dd>
       {{if not .Enabled}}Disabled
@@ -52,6 +53,8 @@
     </dd>
     <dt>BitChord URL</dt>
     <dd class="row">{{if .URL}}<code class="url">{{.MaskedURL}}</code> <button type="button" class="copy" data-copy="{{.URL}}" aria-label="Copy the BitChord URL for {{.Name}}">Copy</button>{{else}}Set the public URL first{{end}}</dd>
+    <dt>Sync Webhook</dt>
+    <dd class="row">{{if .SyncURL}}<code class="url">{{.SyncURL}}</code> <button type="button" class="copy" data-copy="{{.SyncURL}}" aria-label="Copy the Sync Webhook URL for {{.Name}}">Copy</button>{{else}}Set the public URL first{{end}}</dd>
   </dl>
   <div class="row actions">
     <a class="button secondary" href="/setup/servers/{{.Slug}}/edit">Edit</a>
@@ -71,6 +74,19 @@
       <button class="danger">Remove</button>
     </form>
   </div>
+  {{if and .Enabled .Running}}
+  <details class="search-box" style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
+    <summary style="cursor: pointer; font-weight: 500;">Search tester</summary>
+    <div style="margin-top: 0.5rem;" data-search-slug="{{.Slug}}">
+      <p class="hint">Test how track queries are tokenized and matched against this server's index.</p>
+      <div class="row">
+        <input type="text" class="search-q" placeholder="e.g. timebomb all time low">
+        <button type="button" class="search-run secondary">Test</button>
+      </div>
+      <div class="search-results" style="margin-top: 0.5rem;" hidden></div>
+    </div>
+  </details>
+  {{end}}
 </section>
 {{end}}
 {{end}}
@@ -94,5 +110,57 @@ document.querySelectorAll('button.copy').forEach(function (button) {
     });
   });
 });
+
+document.querySelectorAll('[data-search-slug]').forEach(function (box) {
+  var slug = box.dataset.searchSlug;
+  var input = box.querySelector('.search-q');
+  var btn = box.querySelector('.search-run');
+  var out = box.querySelector('.search-results');
+  function runSearch() {
+    var q = input.value.trim();
+    if (!q) return;
+    btn.disabled = true;
+    out.hidden = false;
+    out.textContent = 'Searching...';
+    fetch('/setup/servers/' + encodeURIComponent(slug) + '/test-search?q=' + encodeURIComponent(q))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        btn.disabled = false;
+        if (!data.ok) {
+          out.textContent = 'Error: ' + (data.error || 'unknown');
+          return;
+        }
+        var summary = 'Tokens: ' + JSON.stringify(data.tokens) + ' · Strict: ' + data.strict + ' · Fallback: ' + data.fallback;
+        if (!data.tracks || data.tracks.length === 0) {
+          out.innerHTML = '<p class="hint">' + escapeHTML(summary) + '</p><p>No matching tracks found in index.</p>';
+          return;
+        }
+        var html = '<p class="hint">' + escapeHTML(summary) + '</p><ul style="padding-left: 1.2rem; margin: 0.25rem 0;">';
+        data.tracks.forEach(function (t) {
+          var qual = t.lossless ? 'LOSSLESS' : (t.codec || '');
+          html += '<li><strong>' + escapeHTML(t.title) + '</strong> — ' + escapeHTML(t.artist) + ' <em>(' + escapeHTML(t.album) + ')</em> <small>[' + escapeHTML(qual) + ' · ' + t.duration + 's]</small></li>';
+        });
+        html += '</ul>';
+        out.innerHTML = html;
+      })
+      .catch(function (err) {
+        btn.disabled = false;
+        out.textContent = 'Error: ' + err.message;
+      });
+  }
+  btn.addEventListener('click', runSearch);
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      runSearch();
+    }
+  });
+});
+
+function escapeHTML(str) {
+  return (str || '').replace(/[&<>'"]/g, function (tag) {
+    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[tag] || tag;
+  });
+}
 </script>
 {{end}}

@@ -185,6 +185,33 @@ func TestRunStopsWhenTheContextIsCancelled(t *testing.T) {
 	}
 }
 
+func TestRunManualIntervalWaitsForCancelWithoutPolling(t *testing.T) {
+	slept := false
+	lib := NewLibrary(&scriptedSource{answers: []func() ([]media.Track, error){ok(track("1", "Song"))}}, "", 0, quiet)
+	lib.sleep = func(_ context.Context, _ time.Duration) error {
+		slept = true
+		return nil
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		lib.Run(ctx)
+		close(done)
+	}()
+	for !lib.Ready() {
+		time.Sleep(time.Millisecond)
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Run did not return after cancel")
+	}
+	if slept {
+		t.Error("manual interval library called sleep")
+	}
+}
+
 func TestSearchIsSafeDuringASwap(t *testing.T) {
 	source := &scriptedSource{answers: []func() ([]media.Track, error){ok(track("1", "First Song"))}}
 	lib := NewLibrary(source, "", time.Minute, quiet)

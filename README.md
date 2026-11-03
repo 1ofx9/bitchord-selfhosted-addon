@@ -34,7 +34,9 @@ in your library, your own copy plays.
 - **Fast search.** The addon keeps a list of your tracks in memory, about
   30–50 MB for 100,000 tracks.
 - **Original quality.** Your files are streamed as they are, with seeking.
-- **Private.** Your Plex, Jellyfin and Navidrome tokens never leave the addon,
+- **Search tester.** Test query tokenization and match results directly in the browser to diagnose how tracks are resolved.
+- **Sync webhooks.** Trigger instant library scans via webhooks from Plex, Jellyfin, Navidrome, or automation scripts.
+- **Private.** Your Plex, Jellyfin and Subsonic tokens never leave the addon,
   and every link contains a secret.
 
 <p align="center">
@@ -45,7 +47,7 @@ in your library, your own copy plays.
 ## 📋 Requirements
 
 - Docker.
-- A Plex server, Jellyfin 10.9 or newer, or Navidrome (via its Subsonic API) that the addon can reach.
+- A Plex server, Jellyfin 10.9 or newer, or any Subsonic-compatible server (Navidrome, Gonic, Lyrion/LMS, Airsonic, Funkwhale, Ampache) that the addon can reach.
 - HTTPS, which BitChord requires. Use a reverse proxy such as Caddy, Traefik
   or nginx, or a
   [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/).
@@ -160,6 +162,16 @@ it off.
 > Treat each link like a password: anyone who has it can stream that
 > library. To revoke every link at once, regenerate the secret on the setup
 > page and add the new links to BitChord.
+
+### 🔄 Sync Webhooks
+
+Each server provides an automated sync webhook URL shown on its card in `/setup`:
+
+```
+https://music.example.com/<server id>/<secret>/sync
+```
+
+Sending a `POST` or `GET` request triggers an immediate library sync in the background. Use this URL in Plex Webhooks, Jellyfin Webhooks, or post-import scripts.
 
 ## 🔀 Reverse proxy notes
 

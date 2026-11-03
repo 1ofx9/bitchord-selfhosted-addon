@@ -42,32 +42,42 @@ type kindOption struct {
 	Name string
 }
 
-var kindOptions = []kindOption{{store.Plex, "Plex"}, {store.Jellyfin, "Jellyfin"}, {store.Navidrome, "Navidrome"}}
+var kindOptions = []kindOption{
+	{store.Plex, "Plex"},
+	{store.Jellyfin, "Jellyfin"},
+	{store.Navidrome, "Navidrome / Subsonic"},
+}
 
 func kindName(kind store.Kind) string {
-	for _, option := range kindOptions {
-		if option.Kind == kind {
-			return option.Name
-		}
+	switch kind {
+	case store.Plex:
+		return "Plex"
+	case store.Jellyfin:
+		return "Jellyfin"
+	case store.Navidrome:
+		return "Navidrome"
+	default:
+		return string(kind)
 	}
-	return string(kind)
 }
 
 type serverCard struct {
-	Slug      string
-	Name      string
-	Kind      string
-	Host      string
-	Library   string
-	URL       string
-	MaskedURL string
-	Account   string
-	Auth      store.Auth
-	Enabled   bool
-	Running   bool
-	Status    registry.Status
-	Checked   string
-	Problems  string
+	Slug         string
+	Name         string
+	Kind         string
+	Host         string
+	Library      string
+	URL          string
+	MaskedURL    string
+	SyncURL      string
+	SyncInterval string
+	Account      string
+	Auth         store.Auth
+	Enabled      bool
+	Running      bool
+	Status       registry.Status
+	Checked      string
+	Problems     string
 }
 
 type overviewView struct {
@@ -91,13 +101,26 @@ func (a *app) overviewView(r *http.Request, snapshot store.Snapshot) overviewVie
 		if snapshot.PublicURL != "" {
 			card.URL = snapshot.PublicURL + "/" + server.Slug + "/" + snapshot.Secret
 			card.MaskedURL = snapshot.PublicURL + "/" + server.Slug + "/••••••••••"
+			card.SyncURL = snapshot.PublicURL + "/" + server.Slug + "/" + snapshot.Secret + "/sync"
 		}
+		card.SyncInterval = formatInterval(server.SyncInterval)
 		if status, ok := a.Registry.Status(server.Slug); ok {
 			card.Running, card.Status, card.Checked = true, status, since(status.Refreshed, now)
 		}
 		view.Servers = append(view.Servers, card)
 	}
 	return view
+}
+
+func formatInterval(raw string) string {
+	switch raw {
+	case "":
+		return "Default"
+	case "manual", "0":
+		return "Manual only"
+	default:
+		return "Every " + raw
+	}
 }
 
 type serverFormView struct {
@@ -110,6 +133,7 @@ type serverFormView struct {
 	URL             string
 	Library         string
 	LibraryName     string
+	SyncInterval    string
 	Account         string
 	Auth            store.Auth
 	Enabled         bool
