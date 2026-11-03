@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -384,7 +385,84 @@ func isNotFound(err error) bool     { return errors.Is(err, media.ErrNotFound) }
 func isUnauthorized(err error) bool { return errors.Is(err, media.ErrUnauthorized) }
 
 func (c *Client) OpenFile(ctx context.Context, track media.Track, method string, header http.Header) (*http.Response, error) {
-	return c.http.Open(ctx, method, c.authedPath(track.FileRef), header)
+	res, err := c.http.Open(ctx, method, c.authedPath(track.FileRef), header)
+	if err != nil {
+		return nil, err
+	}
+	if method == http.MethodGet && res.StatusCode >= 200 && res.StatusCode < 300 {
+		rng := ""
+		if header != nil {
+			rng = header.Get("Range")
+		}
+		// Only report playback if starting from the beginning (empty range or bytes=0-)
+		if rng == "" || strings.HasPrefix(rng, "bytes=0-") {
+			go func() {
+				sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				if err := c.Scrobble(sctx, track.ID, false); err != nil {
+					c.log.Debug("navidrome now playing report failed", "id", track.ID, "error", err)
+				}
+			}()
+			res.Body = &scrobbleBody{
+				ReadCloser: res.Body,
+				client:     c,
+				trackID:    track.ID,
+				total:      res.ContentLength,
+			}
+		}
+	}
+	return res, nil
+}
+
+type scrobbleBody struct {
+	io.ReadCloser
+	client    *Client
+	trackID   string
+	total     int64
+	read      int64
+	hitEOF    bool
+	scrobbled bool
+	mu        sync.Mutex
+}
+
+func (s *scrobbleBody) Read(p []byte) (int, error) {
+	n, err := s.ReadCloser.Read(p)
+	s.mu.Lock()
+	s.read += int64(n)
+	if err == io.EOF {
+		s.hitEOF = true
+	}
+	s.mu.Unlock()
+	return n, err
+}
+
+func (s *scrobbleBody) Close() error {
+	s.mu.Lock()
+	shouldScrobble := !s.scrobbled && (s.hitEOF || (s.total > 0 && s.read*2 >= s.total))
+	s.scrobbled = true
+	s.mu.Unlock()
+
+	if shouldScrobble {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := s.client.Scrobble(ctx, s.trackID, true); err != nil {
+				s.client.log.Debug("navidrome scrobble report failed", "id", s.trackID, "error", err)
+			}
+		}()
+	}
+	return s.ReadCloser.Close()
+}
+
+// Scrobble reports playback progress to Navidrome. When submission is false,
+// Navidrome registers it as "now playing". When submission is true, Navidrome
+// records the completed play and forwards it to external scrobblers (e.g. Last.fm).
+func (c *Client) Scrobble(ctx context.Context, id string, submission bool) error {
+	params := url.Values{
+		"id":         {id},
+		"submission": {strconv.FormatBool(submission)},
+	}
+	return c.call(ctx, "scrobble", params, nil)
 }
 
 func (c *Client) OpenArt(ctx context.Context, track media.Track) (*http.Response, error) {

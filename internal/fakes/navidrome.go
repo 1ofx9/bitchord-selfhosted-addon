@@ -189,6 +189,8 @@ func (f *Navidrome) serve(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		writeSub(w, map[string]any{"status": "failed", "error": map[string]any{"code": 70, "message": "not found"}})
+	case "scrobble":
+		writeSub(w, map[string]any{"status": "ok"})
 	default:
 		writeSub(w, map[string]any{"status": "failed", "error": map[string]any{"code": 0, "message": "unknown method"}})
 	}

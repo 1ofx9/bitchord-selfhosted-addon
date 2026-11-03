@@ -3,8 +3,11 @@ package subsonic
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/rairulyle/bitchord-selfhosted-addon/internal/fakes"
 	"github.com/rairulyle/bitchord-selfhosted-addon/internal/media"
@@ -234,5 +237,57 @@ func TestFlexibleLists(t *testing.T) {
 	}
 	if len(singleAlbum) != 1 || singleAlbum[0].Name != "Album 1" {
 		t.Fatalf("single album = %+v", singleAlbum)
+	}
+}
+
+func TestScrobble(t *testing.T) {
+	fake := fakes.NewNavidrome(t)
+	c := newClient(fake)
+	if err := c.Scrobble(context.Background(), "s-1", false); err != nil {
+		t.Fatalf("Scrobble(false) failed: %v", err)
+	}
+	if err := c.Scrobble(context.Background(), "s-1", true); err != nil {
+		t.Fatalf("Scrobble(true) failed: %v", err)
+	}
+	var scrobbles []fakes.Request
+	for _, req := range fake.Requests() {
+		if req.Path == "/rest/scrobble.view" {
+			scrobbles = append(scrobbles, req)
+		}
+	}
+	if len(scrobbles) != 2 {
+		t.Fatalf("expected 2 scrobbles, got %d", len(scrobbles))
+	}
+	if !strings.Contains(scrobbles[0].Query, "submission=false") {
+		t.Errorf("scrobble 0 query = %q, want submission=false", scrobbles[0].Query)
+	}
+	if !strings.Contains(scrobbles[1].Query, "submission=true") {
+		t.Errorf("scrobble 1 query = %q, want submission=true", scrobbles[1].Query)
+	}
+}
+
+func TestOpenFileTriggersScrobble(t *testing.T) {
+	fake := fakes.NewNavidrome(t)
+	c := newClient(fake)
+	track := media.Track{ID: "s-1", FileRef: StreamPath("s-1")}
+	res, err := c.OpenFile(context.Background(), track, http.MethodGet, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Read entire body to EOF so scrobbleBody triggers completion scrobble
+	_, _ = io.ReadAll(res.Body)
+	_ = res.Body.Close()
+
+	// Wait briefly for background goroutines to complete
+	time.Sleep(50 * time.Millisecond)
+
+	var scrobbles []fakes.Request
+	for _, req := range fake.Requests() {
+		if req.Path == "/rest/scrobble.view" {
+			scrobbles = append(scrobbles, req)
+		}
+	}
+	if len(scrobbles) < 2 {
+		t.Fatalf("expected at least 2 scrobbles (now playing + completed), got %d", len(scrobbles))
 	}
 }

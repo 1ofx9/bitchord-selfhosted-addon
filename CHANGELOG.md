@@ -6,6 +6,12 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-11-03
+
+### Added
+
+- Playback progress and scrobble reporting for Navidrome. Playback automatically registers as "Now Playing" in Navidrome's dashboard when streaming begins, and records a completed scrobble upon stream completion to increment play counts and update external scrobblers (e.g. Last.fm, ListenBrainz).
+
 ## [1.2.1] - 2026-11-03
 
 ### Fixed
