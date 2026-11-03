@@ -161,7 +161,7 @@ func (c *Client) Version(ctx context.Context) (string, error) {
 func (c *Client) Libraries(ctx context.Context) ([]media.Library, error) {
 	var answer struct {
 		MusicFolders struct {
-			MusicFolder []MusicFolder `json:"musicFolder"`
+			MusicFolder MusicFolderList `json:"musicFolder"`
 		} `json:"musicFolders"`
 	}
 	if err := c.call(ctx, "getMusicFolders", nil, &answer); err != nil {
@@ -215,7 +215,7 @@ func (c *Client) allTracksSearch3(ctx context.Context, folderFilter string) ([]m
 		}
 		var answer struct {
 			SearchResult3 struct {
-				Song []Child `json:"song"`
+				Song ChildList `json:"song"`
 			} `json:"searchResult3"`
 		}
 		if err := c.call(ctx, "search3", params, &answer); err != nil {
@@ -319,7 +319,7 @@ func (c *Client) allAlbums(ctx context.Context, folderFilter string) ([]AlbumID3
 		}
 		var answer struct {
 			AlbumList2 struct {
-				Album []AlbumID3 `json:"album"`
+				Album AlbumList `json:"album"`
 			} `json:"albumList2"`
 		}
 		if err := c.call(ctx, "getAlbumList2", params, &answer); err != nil {
@@ -338,7 +338,7 @@ func (c *Client) allAlbums(ctx context.Context, folderFilter string) ([]AlbumID3
 func (c *Client) albumSongs(ctx context.Context, albumID string) ([]Child, error) {
 	var answer struct {
 		Album struct {
-			Song []Child `json:"song"`
+			Song ChildList `json:"song"`
 		} `json:"album"`
 	}
 	if err := c.call(ctx, "getAlbum", url.Values{"id": {albumID}}, &answer); err != nil {

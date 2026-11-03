@@ -1,11 +1,45 @@
 package subsonic
 
 import (
+	"bytes"
+	"encoding/json"
 	"net/url"
 	"strings"
 
 	"github.com/rairulyle/bitchord-selfhosted-addon/internal/media"
 )
+
+// StringID unmarshals from either a JSON string (e.g. "0", "abc") or a JSON
+// number (e.g. 0, 1), converting it to a string. This accommodates Subsonic
+// servers where fields like musicFolder.id are integers in the XSD specification
+// while others are strings.
+type StringID string
+
+func (s *StringID) UnmarshalJSON(b []byte) error {
+	trimmed := bytes.TrimSpace(b)
+	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
+		*s = ""
+		return nil
+	}
+	if trimmed[0] == '"' {
+		var str string
+		if err := json.Unmarshal(trimmed, &str); err != nil {
+			return err
+		}
+		*s = StringID(str)
+		return nil
+	}
+	var n json.Number
+	if err := json.Unmarshal(trimmed, &n); err != nil {
+		return err
+	}
+	*s = StringID(n.String())
+	return nil
+}
+
+func (s StringID) String() string {
+	return string(s)
+}
 
 // The Subsonic API wraps every answer in {"subsonic-response": {...}}. The
 // status field is "ok" or "failed"; a failed answer carries an error object.
@@ -14,11 +48,51 @@ type apiError struct {
 	Message string `json:"message"`
 }
 
-// MusicFolder is one library, as getMusicFolders lists them. An empty id means
-// the whole collection; Navidrome always has at least the default folder.
+// MusicFolder is one library, as getMusicFolders lists them. The Subsonic
+// specification defines its id as an integer, though some servers or proxies
+// pass strings; UnmarshalJSON accepts both and stores it as a string.
 type MusicFolder struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+}
+
+func (m *MusicFolder) UnmarshalJSON(b []byte) error {
+	var raw struct {
+		ID   StringID `json:"id"`
+		Name string   `json:"name"`
+	}
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	m.ID = string(raw.ID)
+	m.Name = raw.Name
+	return nil
+}
+
+// MusicFolderList unmarshals from either a JSON array or a single JSON object,
+// guarding against XML-to-JSON gateways that emit a bare object for single items.
+type MusicFolderList []MusicFolder
+
+func (l *MusicFolderList) UnmarshalJSON(b []byte) error {
+	trimmed := bytes.TrimSpace(b)
+	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
+		*l = nil
+		return nil
+	}
+	if trimmed[0] == '[' {
+		var list []MusicFolder
+		if err := json.Unmarshal(trimmed, &list); err != nil {
+			return err
+		}
+		*l = list
+		return nil
+	}
+	var single MusicFolder
+	if err := json.Unmarshal(trimmed, &single); err != nil {
+		return err
+	}
+	*l = []MusicFolder{single}
+	return nil
 }
 
 // AlbumID3 is an album from getAlbumList2.
@@ -29,6 +103,31 @@ type AlbumID3 struct {
 	ArtistID  string `json:"artistId"`
 	CoverArt  string `json:"coverArt"`
 	SongCount int    `json:"songCount"`
+}
+
+// AlbumList unmarshals from either a JSON array or a single JSON object.
+type AlbumList []AlbumID3
+
+func (l *AlbumList) UnmarshalJSON(b []byte) error {
+	trimmed := bytes.TrimSpace(b)
+	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
+		*l = nil
+		return nil
+	}
+	if trimmed[0] == '[' {
+		var list []AlbumID3
+		if err := json.Unmarshal(trimmed, &list); err != nil {
+			return err
+		}
+		*l = list
+		return nil
+	}
+	var single AlbumID3
+	if err := json.Unmarshal(trimmed, &single); err != nil {
+		return err
+	}
+	*l = []AlbumID3{single}
+	return nil
 }
 
 // Child is a song, as getAlbum, getSong, or search3 returns it.
@@ -53,6 +152,31 @@ type Child struct {
 	IsDir              bool   `json:"isDir"`
 	SamplingRate       int    `json:"samplingRate"`
 	BitDepth           int    `json:"bitDepth"`
+}
+
+// ChildList unmarshals from either a JSON array or a single JSON object.
+type ChildList []Child
+
+func (l *ChildList) UnmarshalJSON(b []byte) error {
+	trimmed := bytes.TrimSpace(b)
+	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
+		*l = nil
+		return nil
+	}
+	if trimmed[0] == '[' {
+		var list []Child
+		if err := json.Unmarshal(trimmed, &list); err != nil {
+			return err
+		}
+		*l = list
+		return nil
+	}
+	var single Child
+	if err := json.Unmarshal(trimmed, &single); err != nil {
+		return err
+	}
+	*l = []Child{single}
+	return nil
 }
 
 // convert turns a Subsonic song into the addon's common Track. Codec comes

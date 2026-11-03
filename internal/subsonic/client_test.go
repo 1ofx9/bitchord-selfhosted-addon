@@ -2,6 +2,7 @@ package subsonic
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -166,5 +167,72 @@ func TestResolveFolderByName(t *testing.T) {
 	}
 	if got := newClient(fake).resolveFolderID(context.Background(), ""); got != "" {
 		t.Fatalf("resolveFolderID(empty) = %q, want empty", got)
+	}
+}
+
+func TestMusicFolderFlexibleUnmarshal(t *testing.T) {
+	// Numeric ID (real Navidrome default folder id: 0)
+	var f1 MusicFolder
+	if err := json.Unmarshal([]byte(`{"id": 0, "name": "Music"}`), &f1); err != nil {
+		t.Fatalf("unmarshal numeric 0 failed: %v", err)
+	}
+	if f1.ID != "0" || f1.Name != "Music" {
+		t.Fatalf("got %+v, want ID:0 Name:Music", f1)
+	}
+
+	// Numeric ID > 0
+	var f2 MusicFolder
+	if err := json.Unmarshal([]byte(`{"id": 42, "name": "Hi-Res"}`), &f2); err != nil {
+		t.Fatalf("unmarshal numeric 42 failed: %v", err)
+	}
+	if f2.ID != "42" || f2.Name != "Hi-Res" {
+		t.Fatalf("got %+v, want ID:42 Name:Hi-Res", f2)
+	}
+
+	// String ID
+	var f3 MusicFolder
+	if err := json.Unmarshal([]byte(`{"id": "folder-abc", "name": "Rock"}`), &f3); err != nil {
+		t.Fatalf("unmarshal string id failed: %v", err)
+	}
+	if f3.ID != "folder-abc" || f3.Name != "Rock" {
+		t.Fatalf("got %+v, want ID:folder-abc Name:Rock", f3)
+	}
+}
+
+func TestFlexibleLists(t *testing.T) {
+	// MusicFolderList with single object
+	var singleFolder MusicFolderList
+	if err := json.Unmarshal([]byte(`{"id": 0, "name": "Single"}`), &singleFolder); err != nil {
+		t.Fatalf("unmarshal single folder object failed: %v", err)
+	}
+	if len(singleFolder) != 1 || singleFolder[0].ID != "0" {
+		t.Fatalf("single folder = %+v", singleFolder)
+	}
+
+	// MusicFolderList with array
+	var multiFolder MusicFolderList
+	if err := json.Unmarshal([]byte(`[{"id": 0, "name": "A"}, {"id": 1, "name": "B"}]`), &multiFolder); err != nil {
+		t.Fatalf("unmarshal multi folder array failed: %v", err)
+	}
+	if len(multiFolder) != 2 || multiFolder[0].ID != "0" || multiFolder[1].ID != "1" {
+		t.Fatalf("multi folder = %+v", multiFolder)
+	}
+
+	// ChildList with single song object
+	var singleChild ChildList
+	if err := json.Unmarshal([]byte(`{"id": "s-1", "title": "Song 1"}`), &singleChild); err != nil {
+		t.Fatalf("unmarshal single child failed: %v", err)
+	}
+	if len(singleChild) != 1 || singleChild[0].Title != "Song 1" {
+		t.Fatalf("single child = %+v", singleChild)
+	}
+
+	// AlbumList with single album object
+	var singleAlbum AlbumList
+	if err := json.Unmarshal([]byte(`{"id": "al-1", "name": "Album 1"}`), &singleAlbum); err != nil {
+		t.Fatalf("unmarshal single album failed: %v", err)
+	}
+	if len(singleAlbum) != 1 || singleAlbum[0].Name != "Album 1" {
+		t.Fatalf("single album = %+v", singleAlbum)
 	}
 }

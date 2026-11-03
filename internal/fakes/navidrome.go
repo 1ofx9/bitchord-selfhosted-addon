@@ -90,7 +90,7 @@ func (f *Navidrome) serve(w http.ResponseWriter, r *http.Request) {
 		writeSub(w, map[string]any{
 			"status": "ok",
 			"musicFolders": map[string]any{
-				"musicFolder": []map[string]any{{"id": NavidromeMusicFolder, "name": NavidromeMusicFolderName}},
+				"musicFolder": []map[string]any{{"id": 1, "name": NavidromeMusicFolderName}},
 			},
 		})
 	case "search3":
