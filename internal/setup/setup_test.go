@@ -594,6 +594,40 @@ func TestJellyfinSignInStoresTheTokenAndNeverThePassword(t *testing.T) {
 	_ = plexURLs
 }
 
+func TestNavidromeSignInStoresTheTokenAndNeverThePassword(t *testing.T) {
+	a := newTestApp(t)
+	a.signIn()
+	fake := fakes.NewNavidrome(t)
+	rec, answer := a.json(http.MethodPost, "/setup/navidrome/signin", navidromeSignInRequest{URL: fake.URL, Username: fakes.NavidromeUser, Password: fakes.NavidromePassword})
+	if rec.Code != http.StatusOK || answer["ok"] != true || answer["username"] != fakes.NavidromeUser || answer["ref"] == "" {
+		t.Fatalf("sign-in: %d %v", rec.Code, answer)
+	}
+	if strings.Contains(rec.Body.String(), fakes.NavidromePassword) {
+		t.Fatal("the password reached the browser")
+	}
+	ref := answer["ref"].(string)
+	if rec := a.form("/setup/servers", url.Values{"kind": {"navidrome"}, "label": {"NAS"}, "url": {fake.URL}, "token_ref": {ref}, "library": {"Music"}, "enabled": {"1"}}); rec.Code != http.StatusSeeOther {
+		t.Fatalf("save: %d %s", rec.Code, rec.Body.String())
+	}
+	server, _ := a.store.Snapshot().Server("navidrome-1")
+	if server.Token != fakes.NavidromeToken || server.Auth != store.AuthNavidromeSignIn || server.Account != fakes.NavidromeUser || server.Library != fakes.NavidromeMusicFolder {
+		t.Fatalf("stored = %+v", server)
+	}
+	moved := a.form("/setup/servers/navidrome-1", url.Values{"label": {"NAS"}, "url": {fakes.NewNavidrome(t).URL}, "enabled": {"1"}})
+	if moved.Code != http.StatusBadRequest || !strings.Contains(moved.Body.String(), "sign in again") {
+		t.Fatalf("url change on a signed-in server: %d", moved.Code)
+	}
+	for i := range 5 {
+		rec, _ := a.json(http.MethodPost, "/setup/navidrome/signin", navidromeSignInRequest{URL: fake.URL, Username: fakes.NavidromeUser, Password: "nope"})
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("attempt %d: %d", i, rec.Code)
+		}
+	}
+	if rec, _ := a.json(http.MethodPost, "/setup/navidrome/signin", navidromeSignInRequest{URL: fake.URL, Username: fakes.NavidromeUser, Password: fakes.NavidromePassword}); rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("after five failures: %d", rec.Code)
+	}
+}
+
 func TestConcurrentLoginAttemptsAreLimitedAtomically(t *testing.T) {
 	a := newTestApp(t)
 	a.signIn()

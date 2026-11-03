@@ -6,6 +6,12 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ## [Unreleased]
 
+### Added
+
+- Navidrome support via the Subsonic API. Add Navidrome servers on the setup page with username and password, or seed one from the environment with `NAVIDROME_URL`, `NAVIDROME_USERNAME` and `NAVIDROME_PASSWORD`.
+- Fast flat-library synchronization using the OpenSubsonic `search3` endpoint, with fallback to concurrent album scanning for standard Subsonic servers.
+- Full high-resolution audio metadata extraction (`bitDepth`, `samplingRate`) and extended audio codec detection for Navidrome tracks.
+
 ## [1.1.0] - 2026-09-27
 
 ### Changed

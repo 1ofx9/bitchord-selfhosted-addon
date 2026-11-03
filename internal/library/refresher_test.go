@@ -107,6 +107,7 @@ func TestStatsFollowEveryRefresh(t *testing.T) {
 	if failed.Tracks != 1 || failed.Refreshed != got.Refreshed || failed.LastError != "server down" {
 		t.Fatalf("stats after a failure = %+v", failed)
 	}
+	time.Sleep(10 * time.Millisecond)
 	lib.Refresh(context.Background())
 	if recovered := lib.Stats(); recovered.Tracks != 2 || recovered.LastError != "" || !recovered.Refreshed.After(got.Refreshed) {
 		t.Fatalf("stats after recovery = %+v", recovered)

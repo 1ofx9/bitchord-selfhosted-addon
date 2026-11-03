@@ -5,6 +5,11 @@ services:
       - "8080:8080"
     volumes:
       - </path/to/your/data>:/data
+    # Optional: seed a Navidrome server on startup
+    # environment:
+    #   - NAVIDROME_URL=http://navidrome:4533
+    #   - NAVIDROME_USERNAME=myuser
+    #   - NAVIDROME_PASSWORD=mypassword
     restart: unless-stopped
     networks:
       - proxy
