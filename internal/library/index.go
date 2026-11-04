@@ -10,12 +10,14 @@ import (
 )
 
 type Index struct {
-	tracks      []media.Track
-	byID        map[string]int
-	postings    map[string][]int
-	titlePosts  map[string][]int
-	titleTokens [][]string
-	titleForms  [][]string
+	tracks          []media.Track
+	byID            map[string]int
+	postings        map[string][]int
+	titlePosts      map[string][]int
+	sortedKeys      []string
+	sortedTitleKeys []string
+	titleTokens     [][]string
+	titleForms      [][]string
 }
 
 func NewIndex(tracks []media.Track) *Index {
@@ -55,6 +57,20 @@ func NewIndex(tracks []media.Track) *Index {
 			ix.postings[token] = append(ix.postings[token], i)
 		}
 	}
+	sortedKeys := make([]string, 0, len(ix.postings))
+	for k := range ix.postings {
+		sortedKeys = append(sortedKeys, k)
+	}
+	slices.Sort(sortedKeys)
+	ix.sortedKeys = sortedKeys
+
+	sortedTitleKeys := make([]string, 0, len(ix.titlePosts))
+	for k := range ix.titlePosts {
+		sortedTitleKeys = append(sortedTitleKeys, k)
+	}
+	slices.Sort(sortedTitleKeys)
+	ix.sortedTitleKeys = sortedTitleKeys
+
 	return ix
 }
 
@@ -116,20 +132,46 @@ func stripNoise(q []string) []string {
 	return cleaned
 }
 
+const maxPrefixExpansion = 30
+
+func prefixMatches(sortedKeys []string, token string, maxKeys int) []string {
+	if len(token) < 2 {
+		return nil
+	}
+	idx := sort.SearchStrings(sortedKeys, token)
+	var matched []string
+	for i := idx; i < len(sortedKeys); i++ {
+		key := sortedKeys[i]
+		if !strings.HasPrefix(key, token) {
+			break
+		}
+		matched = append(matched, key)
+		if len(matched) >= maxKeys {
+			break
+		}
+	}
+	return matched
+}
+
 func (ix *Index) lookupPostings(token string, prefix bool) []int {
 	exact := ix.postings[token]
 	if len(exact) > 0 || !prefix || len(token) < 2 {
 		return exact
 	}
+	keys := prefixMatches(ix.sortedKeys, token, maxPrefixExpansion)
+	if len(keys) == 0 {
+		return nil
+	}
+	if len(keys) == 1 {
+		return ix.postings[keys[0]]
+	}
 	var matched []int
 	seen := make(map[int]struct{})
-	for key, posts := range ix.postings {
-		if strings.HasPrefix(key, token) {
-			for _, id := range posts {
-				if _, ok := seen[id]; !ok {
-					seen[id] = struct{}{}
-					matched = append(matched, id)
-				}
+	for _, key := range keys {
+		for _, id := range ix.postings[key] {
+			if _, ok := seen[id]; !ok {
+				seen[id] = struct{}{}
+				matched = append(matched, id)
 			}
 		}
 	}
@@ -142,15 +184,20 @@ func (ix *Index) lookupTitle(token string, prefix bool) []int {
 	if len(exact) > 0 || !prefix || len(token) < 2 {
 		return exact
 	}
+	keys := prefixMatches(ix.sortedTitleKeys, token, maxPrefixExpansion)
+	if len(keys) == 0 {
+		return nil
+	}
+	if len(keys) == 1 {
+		return ix.titlePosts[keys[0]]
+	}
 	var matched []int
 	seen := make(map[int]struct{})
-	for key, posts := range ix.titlePosts {
-		if strings.HasPrefix(key, token) {
-			for _, id := range posts {
-				if _, ok := seen[id]; !ok {
-					seen[id] = struct{}{}
-					matched = append(matched, id)
-				}
+	for _, key := range keys {
+		for _, id := range ix.titlePosts[key] {
+			if _, ok := seen[id]; !ok {
+				seen[id] = struct{}{}
+				matched = append(matched, id)
 			}
 		}
 	}
@@ -273,12 +320,19 @@ func (ix *Index) rank(candidates []int, q []string) {
 	for _, token := range q {
 		wanted[token] = struct{}{}
 	}
-	titleHits := make(map[int]int, len(candidates))
+	titleScores := make(map[int]int, len(candidates))
 	for _, i := range candidates {
 		for _, tokens := range [][]string{ix.titleTokens[i], ix.titleForms[i]} {
 			for _, token := range tokens {
 				if _, ok := wanted[token]; ok {
-					titleHits[i]++
+					titleScores[i] += 20
+					continue
+				}
+				for _, qToken := range q {
+					if len(qToken) >= 2 && strings.HasPrefix(token, qToken) {
+						titleScores[i] += 10
+						break
+					}
 				}
 			}
 		}
@@ -286,8 +340,8 @@ func (ix *Index) rank(candidates []int, q []string) {
 	sort.Slice(candidates, func(a, b int) bool {
 		ia, ib := candidates[a], candidates[b]
 		ta, tb := ix.tracks[ia], ix.tracks[ib]
-		if titleHits[ia] != titleHits[ib] {
-			return titleHits[ia] > titleHits[ib]
+		if titleScores[ia] != titleScores[ib] {
+			return titleScores[ia] > titleScores[ib]
 		}
 		if la, lb := utf8.RuneCountInString(ta.Title), utf8.RuneCountInString(tb.Title); la != lb {
 			return la < lb

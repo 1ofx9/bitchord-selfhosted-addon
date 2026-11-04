@@ -1,6 +1,7 @@
 package library
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -173,5 +174,40 @@ func TestSearchPrefixAndNoiseWords(t *testing.T) {
 	// 4. Year + Remaster stripping: "In the End 2020 Remaster" -> matches "In the End"
 	if got := ids(ix.Search("in the end 2020 remaster", 10)); !reflect.DeepEqual(got, []string{"3"}) {
 		t.Errorf("year+remaster stripping search = %v, want [3]", got)
+	}
+}
+
+func TestPrefixRankingAndExpansionCap(t *testing.T) {
+	// 1. Title prefix match outranks artist/album prefix match, exact title match outranks prefix
+	ix := NewIndex([]media.Track{
+		{ID: "1", Title: "Something Else", Artist: "Kannada Singer", Album: "Great Hits"},
+		{ID: "2", Title: "Kanna Love", Artist: "Unknown", Album: "Various"},
+		{ID: "3", Title: "Kann", Artist: "Exact Matcher", Album: "Short Title"},
+	})
+
+	// When searching "kann", ID 3 (exact title hit) outranks ID 2 (prefix title hit) and ID 1 (artist hit)
+	res := ids(ix.Search("kann", 10))
+	if len(res) == 0 || res[0] != "3" {
+		t.Fatalf("search 'kann' top result = %v, want ID 3", res)
+	}
+
+	// When searching "kan", ID 3 and ID 2 (prefix in title) outrank ID 1 (prefix only in artist)
+	resPrefix := ids(ix.Search("kan", 10))
+	if !reflect.DeepEqual(resPrefix, []string{"3", "2", "1"}) {
+		t.Fatalf("search 'kan' results = %v, want [3 2 1]", resPrefix)
+	}
+
+	// 2. Expansion cap test: create 40 tracks each with a different prefix word (theme00, theme01, ..., theme39)
+	var manyTracks []media.Track
+	for i := 0; i < 40; i++ {
+		manyTracks = append(manyTracks, media.Track{
+			ID:    fmt.Sprintf("t%02d", i),
+			Title: fmt.Sprintf("Theme%02d", i),
+		})
+	}
+	ixMany := NewIndex(manyTracks)
+	gotMany := ixMany.Search("them", 50)
+	if len(gotMany) > 30 {
+		t.Errorf("prefix search expanded %d tracks, want <= 30 (capped)", len(gotMany))
 	}
 }

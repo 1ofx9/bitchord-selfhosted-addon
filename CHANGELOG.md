@@ -6,6 +6,14 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ## [Unreleased]
 
+## [1.3.5] - 2026-11-04
+
+### Changed
+
+- High-performance binary search for prefix matching ($O(\log V)$). Replaced linear map key scans with binary search over pre-sorted vocabulary slices (`sortedKeys` and `sortedTitleKeys`), executing prefix lookups in sub-microsecond time with zero allocations for single-word matches.
+- Guarded prefix expansion cap (max 30 words). Bounded prefix key expansion to prevent CPU and memory spikes when typing broad 2-letter prefixes (e.g. `"th"`, `"re"`).
+- Fractional title relevance ranking. Added weighted title scoring (exact title hits score 2.0x, prefix title hits score 1.0x) so exact songs always rank above partial matches, and songs with the prefix in their title always outrank songs where the prefix only matched an artist or album.
+
 ## [1.3.4] - 2026-11-04
 
 ### Added
