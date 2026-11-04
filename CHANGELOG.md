@@ -6,6 +6,13 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ## [Unreleased]
 
+## [1.3.3] - 2026-11-04
+
+### Fixed
+
+- Mask the secret inside the Webhook helper `curl` command on the setup dashboard, keeping secrets completely hidden from screen display while preserving full copying.
+- Remove third-party Lidarr configuration text from the Webhook helper to keep the dashboard minimal and uncluttered.
+
 ## [1.3.2] - 2026-11-04
 
 ### Added
@@ -17,7 +24,6 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 ### Fixed
 
 - Mask `navidrome-*` secrets in debug request logs. Updated server path redaction regex to match Navidrome slugs alongside Plex and Jellyfin, ensuring tokens and secrets are never exposed in log output.
-- Mask the secret inside the Webhook helper `curl` command on the setup dashboard, keeping secrets completely hidden from screen display while preserving full copying.
 
 ## [1.3.1] - 2026-11-04
 
