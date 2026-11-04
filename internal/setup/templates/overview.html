@@ -62,12 +62,9 @@
         <div style="margin-top: 0.4rem; padding: 0.6rem 0.8rem; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 4px;">
           <p style="margin: 0 0 0.4rem 0;">Trigger instant sync from terminal, script, or cron:</p>
           <div class="row" style="flex-wrap: nowrap; gap: 0.5rem;">
-            <code style="overflow-x: auto; white-space: nowrap; flex: 1; padding: 0.3rem 0.5rem; background: var(--bg); border: 1px solid var(--border); border-radius: 3px;">curl -X POST "{{.SyncURL}}"</code>
+            <code style="overflow-x: auto; white-space: nowrap; flex: 1; padding: 0.3rem 0.5rem; background: var(--bg); border: 1px solid var(--border); border-radius: 3px;">curl -X POST "{{.MaskedSyncURL}}"</code>
             <button type="button" class="copy secondary" data-copy="curl -X POST &quot;{{.SyncURL}}&quot;" style="flex-shrink: 0; padding: 0.2rem 0.6rem; font-size: 0.85em;">Copy curl</button>
           </div>
-          <p style="margin: 0.5rem 0 0 0; font-size: 0.9em; opacity: 0.85;">
-            <strong>Lidarr:</strong> Settings &rarr; Connect &rarr; + &rarr; Custom Webhook &rarr; URL: <code>{{.SyncURL}}</code> &rarr; Method: POST.
-          </p>
         </div>
       </details>
     </dd>

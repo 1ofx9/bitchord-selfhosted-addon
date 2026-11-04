@@ -11,12 +11,13 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 ### Added
 
 - Rich library statistics on the setup overview dashboard. Track status lines now display unique artist and album counts alongside the total track count and the duration of the last scan (e.g. `756 tracks · 94 artists · 68 albums, refreshed 5m ago (took 1.2s)`).
-- Sync Webhook setup helper and one-click `curl` command. An expandable helper section under each server's Sync Webhook row provides a copyable `curl -X POST` command and quick setup instructions for Lidarr / automation tools.
+- Sync Webhook setup helper and one-click `curl` command. An expandable helper section under each server's Sync Webhook row provides a copyable `curl -X POST` command.
 - Recent Activity history card on the overview dashboard. Displays the latest 20 sync and playback events (library scans, "Now playing" reports, and completed scrobbles with percentage played) across all active servers with relative timestamps.
 
 ### Fixed
 
 - Mask `navidrome-*` secrets in debug request logs. Updated server path redaction regex to match Navidrome slugs alongside Plex and Jellyfin, ensuring tokens and secrets are never exposed in log output.
+- Mask the secret inside the Webhook helper `curl` command on the setup dashboard, keeping secrets completely hidden from screen display while preserving full copying.
 
 ## [1.3.1] - 2026-11-04
 

@@ -377,8 +377,11 @@ func TestServerLifecycleThroughTheForms(t *testing.T) {
 		t.Fatal("overview lacks Search tester")
 	}
 	body := a.get("/setup").Body.String()
-	if !strings.Contains(body, "Webhook helper &amp; curl command") || !strings.Contains(body, `curl -X POST "https://music.example.com/plex-1/`) {
+	if !strings.Contains(body, "Webhook helper &amp; curl command") || !strings.Contains(body, `curl -X POST &quot;https://music.example.com/plex-1/`) {
 		t.Fatal("overview lacks webhook helper or curl command")
+	}
+	if !strings.Contains(body, `curl -X POST "https://music.example.com/plex-1/••••••••••/sync"`) {
+		t.Fatal("curl command did not mask secret")
 	}
 	if !strings.Contains(body, "Recent Activity") || !strings.Contains(body, "Synced 5 tracks") {
 		t.Fatalf("overview lacks recent activity: %s", body)
