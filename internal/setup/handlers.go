@@ -430,6 +430,15 @@ func (a *app) refreshServer(w http.ResponseWriter, r *http.Request) {
 		redirectNotice(w, r, fmt.Sprintf("Sync failed for %s: %s", name, err.Error()))
 		return
 	}
+	stats, hasStats := a.Registry.Status(slug)
+	if hasStats && stats.Ready {
+		tookStr := formatDurationMs(stats.Duration)
+		if tookStr != "" {
+			tookStr = " in " + tookStr
+		}
+		redirectNotice(w, r, fmt.Sprintf("%s synced%s (%d tracks · %d artists · %d albums).", name, tookStr, stats.Tracks, stats.Artists, stats.Albums))
+		return
+	}
 	redirectNotice(w, r, name+" synced.")
 }
 

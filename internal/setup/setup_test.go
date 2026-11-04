@@ -395,6 +395,9 @@ func TestServerLifecycleThroughTheForms(t *testing.T) {
 	if rec := a.form("/setup/servers/plex-1/refresh", url.Values{}); rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "synced") {
 		t.Fatalf("refresh: %d %s", rec.Code, rec.Header().Get("Location"))
 	}
+	if !strings.Contains(a.get("/setup").Body.String(), "Online") {
+		t.Fatal("overview lacks online status indicator")
+	}
 
 	edit := a.get("/setup/servers/plex-1/edit")
 	if edit.Code != http.StatusOK || !strings.Contains(edit.Body.String(), `value="Home"`) || !strings.Contains(edit.Body.String(), "leave empty to keep") || !strings.Contains(edit.Body.String(), `<option value="3" selected>Music</option>`) {

@@ -87,6 +87,77 @@ type Result struct {
 	Fallback int
 }
 
+var noiseWords = map[string]struct{}{
+	"live": {}, "remaster": {}, "remastered": {}, "feat": {}, "ft": {}, "featuring": {},
+	"deluxe": {}, "edition": {}, "bonus": {}, "track": {}, "acoustic": {}, "instrumental": {},
+	"official": {}, "video": {}, "audio": {}, "version": {}, "edit": {}, "mix": {}, "remix": {},
+	"pt": {}, "part": {}, "vol": {}, "volume": {},
+}
+
+func isYear(s string) bool {
+	if len(s) != 4 {
+		return false
+	}
+	for i := 0; i < 4; i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return s >= "1900" && s <= "2099"
+}
+
+func stripNoise(q []string) []string {
+	var cleaned []string
+	for _, t := range q {
+		if _, noise := noiseWords[t]; !noise && !isYear(t) {
+			cleaned = append(cleaned, t)
+		}
+	}
+	return cleaned
+}
+
+func (ix *Index) lookupPostings(token string, prefix bool) []int {
+	exact := ix.postings[token]
+	if len(exact) > 0 || !prefix || len(token) < 2 {
+		return exact
+	}
+	var matched []int
+	seen := make(map[int]struct{})
+	for key, posts := range ix.postings {
+		if strings.HasPrefix(key, token) {
+			for _, id := range posts {
+				if _, ok := seen[id]; !ok {
+					seen[id] = struct{}{}
+					matched = append(matched, id)
+				}
+			}
+		}
+	}
+	sort.Ints(matched)
+	return matched
+}
+
+func (ix *Index) lookupTitle(token string, prefix bool) []int {
+	exact := ix.titlePosts[token]
+	if len(exact) > 0 || !prefix || len(token) < 2 {
+		return exact
+	}
+	var matched []int
+	seen := make(map[int]struct{})
+	for key, posts := range ix.titlePosts {
+		if strings.HasPrefix(key, token) {
+			for _, id := range posts {
+				if _, ok := seen[id]; !ok {
+					seen[id] = struct{}{}
+					matched = append(matched, id)
+				}
+			}
+		}
+	}
+	sort.Ints(matched)
+	return matched
+}
+
 func (ix *Index) Search(query string, limit int) []media.Track { return ix.Find(query, limit).Tracks }
 
 func (ix *Index) Find(query string, limit int) Result {
@@ -94,17 +165,59 @@ func (ix *Index) Find(query string, limit int) Result {
 	if len(q) == 0 || limit <= 0 {
 		return Result{}
 	}
-	strict := ix.strict(q)
+	strict := ix.strict(q, false)
 	seen := make(map[int]struct{}, len(strict))
 	for _, i := range strict {
 		seen[i] = struct{}{}
 	}
 	var loose []int
-	for _, i := range ix.fallback(q) {
+	for _, i := range ix.fallback(q, false) {
 		if _, dup := seen[i]; !dup {
 			loose = append(loose, i)
 		}
 	}
+
+	// Tier 3: If no matches, attempt prefix matching for incomplete words
+	if len(strict) == 0 && len(loose) == 0 {
+		for _, i := range ix.strict(q, true) {
+			strict = append(strict, i)
+			seen[i] = struct{}{}
+		}
+		if len(strict) == 0 {
+			for _, i := range ix.fallback(q, true) {
+				if _, dup := seen[i]; !dup {
+					loose = append(loose, i)
+				}
+			}
+		}
+	}
+
+	// Tier 4: If still no matches, strip variant/noise tokens (live, remaster, feat, etc.)
+	if len(strict) == 0 && len(loose) == 0 {
+		cleaned := stripNoise(q)
+		if len(cleaned) > 0 && len(cleaned) < len(q) {
+			cleanStrict := ix.strict(cleaned, false)
+			if len(cleanStrict) == 0 {
+				cleanStrict = ix.strict(cleaned, true)
+			}
+			for _, i := range cleanStrict {
+				strict = append(strict, i)
+				seen[i] = struct{}{}
+			}
+			if len(strict) == 0 {
+				cleanLoose := ix.fallback(cleaned, false)
+				if len(cleanLoose) == 0 {
+					cleanLoose = ix.fallback(cleaned, true)
+				}
+				for _, i := range cleanLoose {
+					if _, dup := seen[i]; !dup {
+						loose = append(loose, i)
+					}
+				}
+			}
+		}
+	}
+
 	ix.rank(strict, q)
 	ix.rank(loose, q)
 	result := Result{Strict: len(strict), Fallback: len(loose)}
@@ -120,10 +233,10 @@ func (ix *Index) Find(query string, limit int) Result {
 	return result
 }
 
-func (ix *Index) strict(q []string) []int {
+func (ix *Index) strict(q []string, prefix bool) []int {
 	lists := make([][]int, len(q))
 	for n, token := range q {
-		lists[n] = ix.postings[token]
+		lists[n] = ix.lookupPostings(token, prefix)
 		if len(lists[n]) == 0 {
 			return nil
 		}
@@ -139,16 +252,16 @@ func (ix *Index) strict(q []string) []int {
 	return result
 }
 
-func (ix *Index) fallback(q []string) []int {
+func (ix *Index) fallback(q []string, prefix bool) []int {
 	hits := map[int]int{}
 	for _, token := range q {
-		for _, i := range ix.titlePosts[token] {
+		for _, i := range ix.lookupTitle(token, prefix) {
 			hits[i]++
 		}
 	}
 	var out []int
 	for i, n := range hits {
-		if count := len(ix.titleTokens[i]); count >= 2 && n == count {
+		if count := len(ix.titleTokens[i]); count >= 2 && n >= count {
 			out = append(out, i)
 		}
 	}

@@ -48,6 +48,8 @@ func TestSearch(t *testing.T) {
 		"no match":                         {"zzz", 50, []string{}},
 		"blank query":                      {"   ", 50, []string{}},
 		"zero limit":                       {"closer", 0, []string{}},
+		"prefix match incomplete word":     {"emo gi", 50, []string{"1"}},
+		"noise word stripped":              {"adventure acoustic", 50, []string{"4"}},
 	}
 	ix := fixtureIndex()
 	for name, tc := range cases {
@@ -143,5 +145,33 @@ func TestFindReportsHowEachTierDid(t *testing.T) {
 				t.Fatalf("Find(%q) = strict %d, fallback %d, returned %d", tc.query, got.Strict, got.Fallback, len(got.Tracks))
 			}
 		})
+	}
+}
+
+func TestSearchPrefixAndNoiseWords(t *testing.T) {
+	ix := NewIndex([]media.Track{
+		{ID: "1", Title: "On Kanna Vachi", Artist: "Saurav Srisan", Album: "On Kanna Vachi"},
+		{ID: "2", Title: "Lose Control", Artist: "Teddy Swims", Album: "I've Tried Everything But Therapy"},
+		{ID: "3", Title: "In the End", Artist: "Linkin Park", Album: "Hybrid Theory"},
+	})
+
+	// 1. Prefix match: "on kann" matches "On Kanna Vachi"
+	if got := ids(ix.Search("on kann", 10)); !reflect.DeepEqual(got, []string{"1"}) {
+		t.Errorf("prefix search 'on kann' = %v, want [1]", got)
+	}
+
+	// 2. Prefix match on single incomplete word
+	if got := ids(ix.Search("teddy swi", 10)); !reflect.DeepEqual(got, []string{"2"}) {
+		t.Errorf("prefix search 'teddy swi' = %v, want [2]", got)
+	}
+
+	// 3. Noise word stripping: "Lose Control (Live)" -> matches "Lose Control"
+	if got := ids(ix.Search("teddy swims lose control live", 10)); !reflect.DeepEqual(got, []string{"2"}) {
+		t.Errorf("noise stripping search = %v, want [2]", got)
+	}
+
+	// 4. Year + Remaster stripping: "In the End 2020 Remaster" -> matches "In the End"
+	if got := ids(ix.Search("in the end 2020 remaster", 10)); !reflect.DeepEqual(got, []string{"3"}) {
+		t.Errorf("year+remaster stripping search = %v, want [3]", got)
 	}
 }

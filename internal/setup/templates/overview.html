@@ -38,7 +38,22 @@
 {{if .Servers}}
 {{range .Servers}}
 <section class="card server" id="server-{{.Slug}}">
-  <h2>{{.Name}} <small>{{.Slug}}</small></h2>
+  <div class="row" style="align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+    <h2 style="margin: 0;">{{.Name}} <small>{{.Slug}}</small></h2>
+    {{if .Enabled}}
+      {{if .Online}}
+        <span class="badge online" style="color: #4ade80; font-size: 0.8em; font-weight: 500; display: inline-flex; align-items: center; gap: 5px;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: #4ade80; display: inline-block;"></span> Online
+        </span>
+      {{else}}
+        <span class="badge offline" style="color: #f87171; font-size: 0.8em; font-weight: 500; display: inline-flex; align-items: center; gap: 5px;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: #f87171; display: inline-block;"></span> Unreachable
+        </span>
+      {{end}}
+    {{else}}
+      <span class="badge muted" style="color: var(--muted); font-size: 0.8em; font-weight: 500;">Disabled</span>
+    {{end}}
+  </div>
   <dl>
     <dt>Server</dt><dd>{{.Host}}{{if .Account}} · signed in as {{.Account}}{{end}}</dd>
     <dt>Library</dt><dd>{{.Library}}</dd>

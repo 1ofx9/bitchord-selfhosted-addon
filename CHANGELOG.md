@@ -6,6 +6,15 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ## [Unreleased]
 
+## [1.3.4] - 2026-11-04
+
+### Added
+
+- Incomplete word and prefix matching in search index. Queries such as `"on kann"` now reliably match `"On Kanna Vachi"` (and `"teddy swi"` matches `"Teddy Swims"`), enabling natural search-as-you-type and partial token lookups.
+- Fallback noise and metadata token stripping in search index. Queries containing variant words (`live`, `remaster`, `remastered`, `deluxe`, `acoustic`, `bonus`, `feat`, `ft`, `version`, `edit`, `mix`) or 4-digit release years (e.g. `2020`) automatically strip noise tokens when strict search yields no results.
+- Real-time server connectivity status badge on the `/setup` overview dashboard. Each server card now displays a live status indicator (`🟢 Online`, `🔴 Unreachable`, or `Disabled`) indicating immediate health and connectivity.
+- Detailed library sync completion notice. Clicking "Sync now" or triggering a manual refresh displays an informative flash banner with scan duration and exact track, artist, and album counts (e.g. `Navidrome synced in 850ms (756 tracks · 94 artists · 68 albums).`).
+
 ## [1.3.3] - 2026-11-04
 
 ### Fixed

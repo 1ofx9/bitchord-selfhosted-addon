@@ -81,6 +81,7 @@ type serverCard struct {
 	Status        registry.Status
 	ScanDuration  string
 	Checked       string
+	Online        bool
 	Problems      string
 }
 
@@ -123,6 +124,7 @@ func (a *app) overviewView(r *http.Request, snapshot store.Snapshot) overviewVie
 			if status.Duration > 0 {
 				card.ScanDuration = formatDurationMs(status.Duration)
 			}
+			card.Online = card.Running && status.Ready && status.LastError == ""
 		}
 		view.Servers = append(view.Servers, card)
 	}
