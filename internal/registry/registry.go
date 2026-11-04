@@ -59,21 +59,34 @@ func DisplayName(kind, label string) string {
 	return kind + " - " + label
 }
 
+type Activity struct {
+	Time    time.Time
+	Slug    string
+	Server  string
+	Kind    string
+	Message string
+}
+
 type Status struct {
 	Ready     bool
 	Tracks    int
+	Artists   int
+	Albums    int
+	Duration  time.Duration
 	Refreshed time.Time
 	LastError string
 }
 
 type Registry struct {
-	opts      Options
-	clientID  string
-	mu        sync.RWMutex
-	entries   map[string]*Entry
-	pending   map[string]*handover
-	handovers sync.WaitGroup
-	changed   chan struct{}
+	opts       Options
+	clientID   string
+	mu         sync.RWMutex
+	entries    map[string]*Entry
+	pending    map[string]*handover
+	handovers  sync.WaitGroup
+	changed    chan struct{}
+	activityMu sync.RWMutex
+	activities []Activity
 }
 
 // handover is a restarted server's new entry, waiting for its first refresh
@@ -148,13 +161,45 @@ func (r *Registry) Lookup(slug string) (*Entry, bool) {
 	return entry, ok
 }
 
+func (r *Registry) RecordActivity(slug, server, kind, message string) {
+	r.activityMu.Lock()
+	defer r.activityMu.Unlock()
+	act := Activity{
+		Time:    time.Now(),
+		Slug:    slug,
+		Server:  server,
+		Kind:    kind,
+		Message: message,
+	}
+	r.activities = append([]Activity{act}, r.activities...)
+	if len(r.activities) > 20 {
+		r.activities = r.activities[:20]
+	}
+}
+
+func (r *Registry) RecentActivity() []Activity {
+	r.activityMu.RLock()
+	defer r.activityMu.RUnlock()
+	res := make([]Activity, len(r.activities))
+	copy(res, r.activities)
+	return res
+}
+
 func (r *Registry) Status(slug string) (Status, bool) {
 	entry, ok := r.Lookup(slug)
 	if !ok {
 		return Status{}, false
 	}
 	stats := entry.Library.Stats()
-	return Status{Ready: entry.Library.Ready(), Tracks: stats.Tracks, Refreshed: stats.Refreshed, LastError: stats.LastError}, true
+	return Status{
+		Ready:     entry.Library.Ready(),
+		Tracks:    stats.Tracks,
+		Artists:   stats.Artists,
+		Albums:    stats.Albums,
+		Duration:  stats.Duration,
+		Refreshed: stats.Refreshed,
+		LastError: stats.LastError,
+	}, true
 }
 
 // Refresh triggers an immediate library sync for the server named by slug.
@@ -322,12 +367,22 @@ func (r *Registry) start(server store.Server) (*Entry, error) {
 	if err != nil {
 		return nil, err
 	}
+	slug := server.Slug
+	name := DisplayName(backend.Name(), server.Label)
+	if sub, ok := backend.(interface{ SetOnActivity(func(string, string)) }); ok {
+		sub.SetOnActivity(func(kind, message string) {
+			r.RecordActivity(slug, name, kind, message)
+		})
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	entry := &Entry{
 		Slug: server.Slug, Kind: server.Kind, Label: server.Label, Backend: backend,
 		Library: library.NewLibrary(backend, server.Library, r.serverInterval(server), log),
 		Log:     log, config: server, cancel: cancel, done: make(chan struct{}),
 	}
+	entry.Library.SetOnActivity(func(kind, message string) {
+		r.RecordActivity(slug, name, kind, message)
+	})
 	go func() {
 		defer close(entry.done)
 		entry.Library.Run(ctx)

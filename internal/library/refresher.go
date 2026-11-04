@@ -2,6 +2,7 @@ package library
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"sync/atomic"
@@ -18,25 +19,35 @@ type Source interface {
 
 type Stats struct {
 	Tracks    int
+	Artists   int
+	Albums    int
+	Duration  time.Duration
 	Refreshed time.Time
 	LastError string
 }
 
 type Library struct {
-	source   Source
-	filter   string
-	interval time.Duration
-	log      *slog.Logger
-	index    atomic.Pointer[Index]
-	sleep    func(context.Context, time.Duration) error
-	mu       sync.Mutex
-	stats    Stats
-	tried    chan struct{}
-	tryOnce  sync.Once
+	source     Source
+	filter     string
+	interval   time.Duration
+	log        *slog.Logger
+	onActivity func(kind, message string)
+	index      atomic.Pointer[Index]
+	sleep      func(context.Context, time.Duration) error
+	mu         sync.Mutex
+	stats      Stats
+	tried      chan struct{}
+	tryOnce    sync.Once
 }
 
 func NewLibrary(source Source, filter string, interval time.Duration, log *slog.Logger) *Library {
 	return &Library{source: source, filter: filter, interval: interval, log: log, sleep: sleep, tried: make(chan struct{})}
+}
+
+func (l *Library) SetOnActivity(fn func(kind, message string)) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.onActivity = fn
 }
 
 // Tried is closed once the first refresh has finished, whether it loaded an
@@ -79,25 +90,60 @@ func (l *Library) Refresh(ctx context.Context) error {
 	defer l.tryOnce.Do(func() { close(l.tried) })
 	started := time.Now()
 	all, err := l.source.AllTracks(ctx, l.filter)
+	took := time.Since(started)
 	if err != nil {
-		l.note(func(s *Stats) { s.LastError = err.Error() })
+		l.note(func(s *Stats) { s.LastError = err.Error(); s.Duration = took })
+		l.mu.Lock()
+		act := l.onActivity
+		l.mu.Unlock()
+		if act != nil {
+			act("sync_error", "Sync failed: "+err.Error())
+		}
 		return err
 	}
 	tracks := make([]media.Track, 0, len(all))
+	artistsMap := make(map[string]struct{})
+	albumsMap := make(map[string]struct{})
 	for _, track := range all {
 		if track.Playable() {
 			tracks = append(tracks, track)
+			if track.Artist != "" {
+				artistsMap[track.Artist] = struct{}{}
+			}
+			if track.Album != "" {
+				albumsMap[track.Album] = struct{}{}
+			}
 		}
 	}
 	next := NewIndex(tracks)
 	previous := l.index.Swap(next)
-	l.note(func(s *Stats) { *s = Stats{Tracks: len(tracks), Refreshed: time.Now()} })
+	stats := Stats{
+		Tracks:    len(tracks),
+		Artists:   len(artistsMap),
+		Albums:    len(albumsMap),
+		Duration:  took,
+		Refreshed: time.Now(),
+	}
+	l.note(func(s *Stats) { *s = stats })
 	removed := 0
 	if previous != nil {
 		removed = previous.missingFrom(next)
 	}
 	l.log.Info("library indexed", "tracks", len(tracks), "added", next.missingFrom(previous), "removed", removed,
-		"skipped", len(all)-len(tracks), "took", time.Since(started).String())
+		"skipped", len(all)-len(tracks), "artists", len(artistsMap), "albums", len(albumsMap), "took", took.String())
+	l.mu.Lock()
+	act := l.onActivity
+	l.mu.Unlock()
+	if act != nil {
+		var tookStr string
+		if took < time.Second {
+			tookStr = fmt.Sprintf("%dms", took.Milliseconds())
+		} else {
+			tookStr = fmt.Sprintf("%.1fs", took.Seconds())
+		}
+		msg := fmt.Sprintf("Synced %d tracks · %d artists · %d albums (took %s)", len(tracks), len(artistsMap), len(albumsMap), tookStr)
+		act("sync", msg)
+	}
 	return nil
 }
 

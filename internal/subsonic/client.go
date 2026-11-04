@@ -36,6 +36,7 @@ type Options struct {
 	HeaderTimeout   time.Duration
 	CallTimeout     time.Duration
 	Log             *slog.Logger
+	OnActivity      func(kind, message string)
 }
 
 type Client struct {
@@ -45,6 +46,7 @@ type Client struct {
 	scrobblePercent int
 	tracker         *playbackTracker
 	log             *slog.Logger
+	onActivity      func(kind, message string)
 }
 
 // SplitCredential splits the stored credential "user:password"; the first
@@ -80,7 +82,12 @@ func New(o Options) *Client {
 		scrobblePercent: percent,
 		tracker:         &playbackTracker{},
 		log:             o.Log,
+		onActivity:      o.OnActivity,
 	}
+}
+
+func (c *Client) SetOnActivity(fn func(kind, message string)) {
+	c.onActivity = fn
 }
 
 func (c *Client) Name() string { return "Navidrome" }
@@ -427,12 +434,19 @@ type playbackTracker struct {
 }
 
 func (c *Client) startPlayback(track media.Track) {
+	trackLabel := track.Title
+	if track.Artist != "" {
+		trackLabel = track.Title + " — " + track.Artist
+	}
+
 	if c.scrobblePercent <= 0 {
 		// Scrobbling disabled, only report "Now Playing"
 		go func() {
 			sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			_ = c.Scrobble(sctx, track.ID, false)
+			if err := c.Scrobble(sctx, track.ID, false); err == nil && c.onActivity != nil {
+				c.onActivity("now_playing", "Now playing: "+trackLabel)
+			}
 		}()
 		return
 	}
@@ -464,6 +478,8 @@ func (c *Client) startPlayback(track media.Track) {
 		defer cancel()
 		if err := c.Scrobble(sctx, track.ID, false); err != nil {
 			c.log.Debug("navidrome now playing report failed", "id", track.ID, "error", err)
+		} else if c.onActivity != nil {
+			c.onActivity("now_playing", "Now playing: "+trackLabel)
 		}
 	}()
 
@@ -491,6 +507,8 @@ func (c *Client) startPlayback(track media.Track) {
 				defer cancel()
 				if err := c.Scrobble(sctx, trackID, true); err != nil {
 					c.log.Debug("navidrome scrobble report failed", "id", trackID, "error", err)
+				} else if c.onActivity != nil {
+					c.onActivity("scrobble", fmt.Sprintf("Scrobbled: %s (%d%% played)", trackLabel, c.scrobblePercent))
 				}
 			}()
 		}

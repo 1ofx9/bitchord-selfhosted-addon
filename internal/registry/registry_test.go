@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -568,5 +569,26 @@ func TestRegistryServerInterval(t *testing.T) {
 	s.SyncInterval = "0"
 	if got := r.serverInterval(s); got != 0 {
 		t.Errorf("zero interval = %v, want 0", got)
+	}
+}
+
+func TestRegistryActivity(t *testing.T) {
+	r := newRegistry(t, snapshot())
+	r.RecordActivity("server-1", "My Server", "sync", "Synced 100 tracks")
+	r.RecordActivity("server-1", "My Server", "now_playing", "Now playing: Song 1")
+	recent := r.RecentActivity()
+	if len(recent) != 2 {
+		t.Fatalf("expected 2 activities, got %d", len(recent))
+	}
+	if recent[0].Kind != "now_playing" || recent[1].Kind != "sync" {
+		t.Errorf("unexpected order of activities: %+v", recent)
+	}
+
+	// Verify ring buffer limit of 20
+	for i := 0; i < 25; i++ {
+		r.RecordActivity("server-1", "My Server", "test", fmt.Sprintf("event %d", i))
+	}
+	if len(r.RecentActivity()) != 20 {
+		t.Errorf("expected activity ring buffer capped at 20, got %d", len(r.RecentActivity()))
 	}
 }

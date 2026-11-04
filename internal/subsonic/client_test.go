@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -314,5 +315,44 @@ func TestOpenFileNowPlayingAndSkipping(t *testing.T) {
 		if strings.Contains(req.Query, "submission=true") {
 			t.Fatalf("unexpected completed scrobble for skipped track: %s", req.Query)
 		}
+	}
+}
+
+func TestSubsonicActivityCallback(t *testing.T) {
+	fake := fakes.NewNavidrome(t)
+	c := newClient(fake)
+	var activities []string
+	var mu sync.Mutex
+	c.SetOnActivity(func(kind, message string) {
+		mu.Lock()
+		defer mu.Unlock()
+		activities = append(activities, kind+": "+message)
+	})
+
+	track := media.Track{ID: "s-1", Title: "So Good", Artist: "Artist", DurationSec: 100, FileRef: StreamPath("s-1")}
+	res, err := c.OpenFile(context.Background(), track, http.MethodGet, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		mu.Lock()
+		count := len(activities)
+		mu.Unlock()
+		if count > 0 {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(activities) == 0 {
+		t.Fatal("expected activity callback for now playing")
+	}
+	if !strings.Contains(activities[0], "now_playing") || !strings.Contains(activities[0], "So Good") {
+		t.Errorf("unexpected activity: %s", activities[0])
 	}
 }

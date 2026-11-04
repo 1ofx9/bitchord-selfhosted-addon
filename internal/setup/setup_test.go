@@ -376,6 +376,13 @@ func TestServerLifecycleThroughTheForms(t *testing.T) {
 	if !strings.Contains(a.get("/setup").Body.String(), "Search tester") {
 		t.Fatal("overview lacks Search tester")
 	}
+	body := a.get("/setup").Body.String()
+	if !strings.Contains(body, "Webhook helper &amp; curl command") || !strings.Contains(body, `curl -X POST "https://music.example.com/plex-1/`) {
+		t.Fatal("overview lacks webhook helper or curl command")
+	}
+	if !strings.Contains(body, "Recent Activity") || !strings.Contains(body, "Synced 5 tracks") {
+		t.Fatalf("overview lacks recent activity: %s", body)
+	}
 	if searchRec := a.get("/setup/servers/plex-1/test-search?q=First+Song"); searchRec.Code != http.StatusOK || !strings.Contains(searchRec.Body.String(), `"ok":true`) {
 		t.Fatalf("test-search failed: %d %s", searchRec.Code, searchRec.Body.String())
 	}

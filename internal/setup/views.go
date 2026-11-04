@@ -79,15 +79,25 @@ type serverCard struct {
 	Enabled       bool
 	Running       bool
 	Status        registry.Status
+	ScanDuration  string
 	Checked       string
 	Problems      string
 }
 
+type ActivityView struct {
+	TimeAgo string
+	Slug    string
+	Server  string
+	Kind    string
+	Message string
+}
+
 type overviewView struct {
 	page
-	PublicURL string
-	Secret    string
-	Servers   []serverCard
+	PublicURL  string
+	Secret     string
+	Servers    []serverCard
+	Activities []ActivityView
 }
 
 func (a *app) overviewView(r *http.Request, snapshot store.Snapshot) overviewView {
@@ -110,8 +120,20 @@ func (a *app) overviewView(r *http.Request, snapshot store.Snapshot) overviewVie
 		card.SyncInterval = formatInterval(server.SyncInterval, a.Registry.DefaultInterval())
 		if status, ok := a.Registry.Status(server.Slug); ok {
 			card.Running, card.Status, card.Checked = true, status, since(status.Refreshed, now)
+			if status.Duration > 0 {
+				card.ScanDuration = formatDurationMs(status.Duration)
+			}
 		}
 		view.Servers = append(view.Servers, card)
+	}
+	for _, act := range a.Registry.RecentActivity() {
+		view.Activities = append(view.Activities, ActivityView{
+			TimeAgo: since(act.Time, now),
+			Slug:    act.Slug,
+			Server:  act.Server,
+			Kind:    act.Kind,
+			Message: act.Message,
+		})
 	}
 	return view
 }
@@ -143,6 +165,16 @@ func formatDuration(d time.Duration) string {
 	default:
 		return d.String()
 	}
+}
+
+func formatDurationMs(d time.Duration) string {
+	if d <= 0 {
+		return ""
+	}
+	if d < time.Second {
+		return fmt.Sprintf("%dms", d.Milliseconds())
+	}
+	return fmt.Sprintf("%.1fs", d.Seconds())
 }
 
 type serverFormView struct {
