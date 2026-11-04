@@ -34,6 +34,7 @@ type Library struct {
 	onActivity func(kind, message string)
 	index      atomic.Pointer[Index]
 	sleep      func(context.Context, time.Duration) error
+	refreshSem chan struct{}
 	mu         sync.Mutex
 	stats      Stats
 	tried      chan struct{}
@@ -41,7 +42,15 @@ type Library struct {
 }
 
 func NewLibrary(source Source, filter string, interval time.Duration, log *slog.Logger) *Library {
-	return &Library{source: source, filter: filter, interval: interval, log: log, sleep: sleep, tried: make(chan struct{})}
+	return &Library{
+		source:     source,
+		filter:     filter,
+		interval:   interval,
+		log:        log,
+		sleep:      sleep,
+		refreshSem: make(chan struct{}, 1),
+		tried:      make(chan struct{}),
+	}
 }
 
 func (l *Library) SetOnActivity(fn func(kind, message string)) {
@@ -87,6 +96,12 @@ func (l *Library) Get(id string) (media.Track, bool) {
 }
 
 func (l *Library) Refresh(ctx context.Context) error {
+	select {
+	case l.refreshSem <- struct{}{}:
+		defer func() { <-l.refreshSem }()
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 	defer l.tryOnce.Do(func() { close(l.tried) })
 	started := time.Now()
 	all, err := l.source.AllTracks(ctx, l.filter)

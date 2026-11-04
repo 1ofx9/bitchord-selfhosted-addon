@@ -6,6 +6,18 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ## [Unreleased]
 
+## [1.3.6] - 2026-11-04
+
+### Fixed
+
+- Serialize concurrent library sync requests. Added channel-based synchronization to prevent multiple simultaneous library syncs from running concurrently on the same server, eliminating memory spikes and OOM risks from rapid webhook triggers or double-clicks.
+- Block cloud instance metadata IP addresses in server URLs. Rejects link-local and cloud metadata addresses (`169.254.169.254`, `fe80::/10`, `instance-data`, `metadata.google.internal`) in `ValidateServerURL` as SSRF defense-in-depth.
+
+### Security
+
+- Add standard web security headers to the `/setup` admin interface: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and `Referrer-Policy: same-origin`.
+- Add advisory hint in the Navidrome setup form recommending the use of a dedicated non-admin user account for Subsonic API authentication.
+
 ## [1.3.5] - 2026-11-04
 
 ### Changed

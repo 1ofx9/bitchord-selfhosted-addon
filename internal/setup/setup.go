@@ -193,6 +193,9 @@ type session struct {
 // session must carry the CSRF token and come from this origin.
 func (a *app) gate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "same-origin")
 		r.Body = http.MaxBytesReader(w, r.Body, maxFormBytes)
 		if r.Method == http.MethodPost && crossSite(r) {
 			http.Error(w, "cross-site request refused", http.StatusForbidden)

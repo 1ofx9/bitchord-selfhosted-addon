@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -269,4 +270,44 @@ func TestTriedClosesAfterTheFirstRefreshEvenWhenItFails(t *testing.T) {
 		t.Fatal("not tried after a failed refresh")
 	}
 	lib.Refresh(context.Background())
+}
+
+func TestConcurrentRefreshesAreSerialized(t *testing.T) {
+	var inFlight atomic.Int32
+	var maxConcurrent atomic.Int32
+	source := &concurrencySource{
+		fetch: func() ([]media.Track, error) {
+			current := inFlight.Add(1)
+			defer inFlight.Add(-1)
+			for {
+				old := maxConcurrent.Load()
+				if current <= old || maxConcurrent.CompareAndSwap(old, current) {
+					break
+				}
+			}
+			time.Sleep(10 * time.Millisecond)
+			return []media.Track{track("1", "One")}, nil
+		},
+	}
+	lib := NewLibrary(source, "", time.Minute, quiet)
+	var wg sync.WaitGroup
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = lib.Refresh(context.Background())
+		}()
+	}
+	wg.Wait()
+	if got := maxConcurrent.Load(); got != 1 {
+		t.Fatalf("max concurrent refreshes = %d, want 1 (strictly serialized)", got)
+	}
+}
+
+type concurrencySource struct {
+	fetch func() ([]media.Track, error)
+}
+
+func (c *concurrencySource) AllTracks(ctx context.Context, filter string) ([]media.Track, error) {
+	return c.fetch()
 }
