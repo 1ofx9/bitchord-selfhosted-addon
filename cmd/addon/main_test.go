@@ -247,25 +247,6 @@ func TestServeAnswersEveryServerAndShutsDownOnCancel(t *testing.T) {
 	}
 }
 
-func TestServeSeedsNavidromeFromEnvironment(t *testing.T) {
-	fake := fakes.NewNavidrome(t)
-	cfg := testConfig()
-	cfg.NavidromeURL = fake.URL
-	cfg.NavidromeUsername = fakes.NavidromeUser
-	cfg.NavidromePassword = fakes.NavidromePassword
-	st := newStore(t)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	logs := &syncBuffer{}
-	base, done := start(ctx, t, cfg, st, newLogger("text", slog.LevelInfo, logs))
-	waitHealthy(t, base)
-	if status, body := get(t, base+"/navidrome-1/"+testSecret+"/search?q=new+religion"); status != http.StatusOK || !strings.Contains(body, `"id":"s-1"`) {
-		t.Fatalf("navidrome search: %d %s", status, body)
-	}
-	cancel()
-	<-done
-}
-
 func TestServeStopsTheRefreshLoopBeforeShuttingDown(t *testing.T) {
 	fake := fakes.NewPlex(t)
 	sectionsBlocked := make(chan struct{})

@@ -144,6 +144,15 @@ func parsePages() map[string]*template.Template {
 		page := strings.TrimSuffix(strings.TrimPrefix(name, "templates/"), ".html")
 		pages[page] = template.Must(template.New("layout.html").Funcs(template.FuncMap{
 			"since": since,
+			"formatVersion": func(v string) string {
+				if v == "" || v == "dev" {
+					return "dev"
+				}
+				if strings.HasPrefix(v, "v") {
+					return v
+				}
+				return "v" + v
+			},
 		}).ParseFS(templateFiles, "templates/layout.html", name))
 	}
 	return pages

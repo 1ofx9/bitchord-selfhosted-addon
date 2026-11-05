@@ -138,9 +138,6 @@ These optional environment variables are the only other settings:
 | `PORT`               | `8080`  | Port the addon listens on                                            |
 | `LOG_LEVEL`          | `info`  | `debug`, `info`, `warn` or `error`                                   |
 | `LOG_FORMAT`         | `text`  | `text`, or `json` for log collectors                                 |
-| `NAVIDROME_URL`      |         | Optional: URL of a Navidrome server to seed on startup                |
-| `NAVIDROME_USERNAME` |         | Optional: Navidrome username (set with URL and password)             |
-| `NAVIDROME_PASSWORD` |         | Optional: Navidrome password (set with URL and username)             |
 
 ## 📱 Using it in BitChord
 

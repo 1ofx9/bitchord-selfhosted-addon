@@ -213,32 +213,6 @@ func (s *Store) UpdateServer(slug string, change func(*Server) error) error {
 	})
 }
 
-// EnsureNavidrome adds a Navidrome server for url with the given credential
-// unless a Navidrome server already points at that url, so a credential set in
-// the environment seeds the first run without ever overwriting a server the
-// user edited on the setup page. It reports whether it added one.
-func (s *Store) EnsureNavidrome(url, credential, account string) (bool, error) {
-	added := false
-	err := s.Update(func(data *Snapshot) error {
-		for _, server := range data.Servers {
-			if server.Kind == Navidrome && server.URL == url {
-				return nil
-			}
-		}
-		server := Server{
-			Kind: Navidrome, URL: url, Token: credential,
-			Auth: AuthNavidromeSignIn, Account: account, Enabled: true,
-			ScrobblePercent: 50,
-			Created:         time.Now().UTC().Truncate(time.Second),
-		}
-		server.Slug = nextSlug(server.Kind, data.Servers)
-		data.Servers = append(data.Servers, server)
-		added = true
-		return nil
-	})
-	return added, err
-}
-
 func (s *Store) RemoveServer(slug string) error {
 	return s.Update(func(data *Snapshot) error {
 		before := len(data.Servers)

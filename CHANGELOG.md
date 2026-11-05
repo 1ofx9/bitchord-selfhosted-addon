@@ -6,6 +6,17 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ## [Unreleased]
 
+## [1.3.8] - 2026-11-05
+
+### Changed
+
+- Moved the version indicator badge to the header next to the project title and removed the empty footer.
+- Improved empty state messaging on `/setup` overview to be cleaner and more inviting: "No servers yet. Connect your Plex, Jellyfin, or Navidrome server to get started."
+
+### Removed
+
+- Removed startup environment seeding for Navidrome (`NAVIDROME_URL`, `NAVIDROME_USERNAME`, `NAVIDROME_PASSWORD`) to enforce consistent, secure configuration of all server types via the `/setup` UI.
+
 ## [1.3.7] - 2026-11-05
 
 ### Added
@@ -116,7 +127,7 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ### Added
 
-- Navidrome support via the Subsonic API. Add Navidrome servers on the setup page with username and password, or seed one from the environment with `NAVIDROME_URL`, `NAVIDROME_USERNAME` and `NAVIDROME_PASSWORD`.
+- Navidrome support via the Subsonic API. Add Navidrome servers on the setup page with username and password.
 - Fast flat-library synchronization using the OpenSubsonic `search3` endpoint, with fallback to concurrent album scanning for standard Subsonic servers.
 - Full high-resolution audio metadata extraction (`bitDepth`, `samplingRate`) and extended audio codec detection for Navidrome tracks.
 

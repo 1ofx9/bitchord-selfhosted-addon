@@ -232,26 +232,6 @@ func TestNavidromeServerIsAccepted(t *testing.T) {
 	}
 }
 
-func TestEnsureNavidromeSeedsOnce(t *testing.T) {
-	s := open(t)
-	added, err := s.EnsureNavidrome("http://navidrome:4533", "lyle:secret", "lyle")
-	if err != nil || !added {
-		t.Fatalf("first seed added=%v err=%v", added, err)
-	}
-	got, ok := s.Snapshot().Server("navidrome-1")
-	if !ok || got.Kind != Navidrome || got.Auth != AuthNavidromeSignIn || got.Token != "lyle:secret" || !got.Enabled {
-		t.Fatalf("seeded server = %+v ok=%v", got, ok)
-	}
-	// A second run with the same URL must not duplicate or overwrite.
-	added, err = s.EnsureNavidrome("http://navidrome:4533", "other:creds", "other")
-	if err != nil || added {
-		t.Fatalf("second seed added=%v err=%v", added, err)
-	}
-	if len(s.Snapshot().Servers) != 1 {
-		t.Fatalf("servers = %d, want 1", len(s.Snapshot().Servers))
-	}
-}
-
 func TestValidation(t *testing.T) {
 	s := open(t)
 	cases := map[string]struct {
