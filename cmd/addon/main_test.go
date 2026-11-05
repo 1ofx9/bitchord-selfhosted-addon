@@ -191,6 +191,9 @@ func TestAnEmptyStoreServesTheSetupPageAndIsHealthy(t *testing.T) {
 	if status, _ := get(t, base+"/setup/static/style.css"); status != http.StatusOK {
 		t.Fatalf("stylesheet: %d", status)
 	}
+	if status, body := get(t, base+"/favicon.ico"); status != http.StatusOK || !strings.Contains(body, "<svg") {
+		t.Fatalf("favicon: %d %s", status, body)
+	}
 	if status, body := get(t, base+"/plex-1/"+st.Snapshot().Secret+"/manifest.json"); status != http.StatusNotFound || body != "" {
 		t.Fatalf("unknown server: %d %q", status, body)
 	}

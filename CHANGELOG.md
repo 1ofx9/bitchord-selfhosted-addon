@@ -6,6 +6,12 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ## [Unreleased]
 
+## [1.3.10] - 2026-11-05
+
+### Added
+
+- Inline SVG favicon. Added embedded SVG favicon in setup layout and `GET /favicon.ico` handler to eliminate 404s in logs and show a clean music icon in browser tabs.
+
 ## [1.3.9] - 2026-11-05
 
 ### Fixed
