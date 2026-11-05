@@ -6,6 +6,24 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ## [Unreleased]
 
+## [1.3.11] - 2026-11-05
+
+### Added
+
+- Clean `Servers` section header with right-aligned `+ Add server` button to clearly separate server cards from global configuration settings.
+- Immediate visual feedback on `Sync now` button (`Syncing...` state and pointer disable) to prevent duplicate clicks during index refreshes.
+- Dark mode flash prevention via `<meta name="color-scheme" content="light dark">`.
+- Robust hidden-textarea clipboard copy fallback for restricted browser permissions.
+- Direct clickable link on server hostnames.
+
+### Changed
+
+- Replaced favicon with minimal Lucide eighth-notes SVG featuring automatic light and dark theme stroke color switching.
+
+### Removed
+
+- Removed unused QR code generator from overview dashboard.
+
 ## [1.3.10] - 2026-11-05
 
 ### Added
