@@ -235,6 +235,19 @@ p.error::before { content: "!"; box-shadow: inset 0 0 0 1px var(--strong); }
 span.ok::before, p.ok::before { content: "✓ "; font-weight: 700; }
 .warn { color: var(--strong); font-weight: 500; }
 
+.server-link {
+  color: var(--strong);
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.server-link:hover {
+  text-decoration-color: var(--strong);
+}
+
 /* Modern Collapsible Accordions (Search tester, Recent activity, Webhook helper) */
 details.accordion {
   border: 1px solid var(--line);

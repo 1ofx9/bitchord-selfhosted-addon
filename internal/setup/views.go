@@ -68,6 +68,7 @@ type serverCard struct {
 	Name          string
 	Kind          string
 	Host          string
+	ServerURL     string
 	Library       string
 	URL           string
 	MaskedURL     string
@@ -107,7 +108,7 @@ func (a *app) overviewView(r *http.Request, snapshot store.Snapshot) overviewVie
 	for _, server := range snapshot.Ordered() {
 		card := serverCard{
 			Slug: server.Slug, Name: registry.DisplayName(kindName(server.Kind), server.Label), Kind: kindName(server.Kind),
-			Host: hostOf(server.URL), Library: cmp.Or(server.LibraryName, server.Library), Account: server.Account, Auth: server.Auth, Enabled: server.Enabled,
+			Host: hostOf(server.URL), ServerURL: server.URL, Library: cmp.Or(server.LibraryName, server.Library), Account: server.Account, Auth: server.Auth, Enabled: server.Enabled,
 		}
 		if card.Library == "" {
 			card.Library = "All music"

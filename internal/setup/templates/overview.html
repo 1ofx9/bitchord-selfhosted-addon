@@ -32,7 +32,10 @@
   <a class="button" href="/setup/servers/new">Add a server</a>
 </section>
 {{else}}
-<p><a class="button" href="/setup/servers/new">Add a server</a></p>
+<div class="row servers-header" style="justify-content: space-between; align-items: center; margin: 32px 0 12px;">
+  <h2 style="margin: 0; font-size: 16px; font-weight: 600; color: var(--strong);">Servers</h2>
+  <a class="button" href="/setup/servers/new">+ Add server</a>
+</div>
 {{end}}
 {{end}}
 {{if .Servers}}
@@ -55,7 +58,7 @@
     {{end}}
   </div>
   <dl>
-    <dt>Server</dt><dd>{{.Host}}{{if .Account}} · signed in as {{.Account}}{{end}}</dd>
+    <dt>Server</dt><dd><a href="{{.ServerURL}}" target="_blank" rel="noopener" class="server-link" title="Open {{.ServerURL}} in a new tab">{{.Host}}</a>{{if .Account}} · signed in as {{.Account}}{{end}}</dd>
     <dt>Library</dt><dd>{{.Library}}</dd>
     <dt>Sync Interval</dt><dd>{{.SyncInterval}}</dd>
     <dt>Status</dt>
@@ -94,9 +97,9 @@
   <div class="row actions">
     <a class="button secondary" href="/setup/servers/{{.Slug}}/edit">Edit</a>
     {{if and .Enabled .Running}}
-    <form method="post" action="/setup/servers/{{.Slug}}/refresh">
+    <form method="post" action="/setup/servers/{{.Slug}}/refresh" class="sync-form">
       <input type="hidden" name="csrf" value="{{$.CSRF}}">
-      <button class="secondary">Sync now</button>
+      <button class="secondary sync-btn">Sync now</button>
     </form>
     {{end}}
     <form method="post" action="/setup/servers/{{.Slug}}/enabled">
@@ -169,13 +172,54 @@ if (secretToggle) {
     secretToggle.textContent = hidden ? 'Hide' : 'Show';
   });
 }
+
+function copyText(text, btn) {
+  function success() {
+    var label = btn.textContent;
+    btn.textContent = 'Copied';
+    setTimeout(function () { btn.textContent = label; }, 1500);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(success).catch(function () {
+      fallbackCopy(text, success);
+    });
+  } else {
+    fallbackCopy(text, success);
+  }
+}
+
+function fallbackCopy(text, onSuccess) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  ta.style.top = '-9999px';
+  ta.setAttribute('readonly', '');
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try {
+    if (document.execCommand('copy')) {
+      onSuccess();
+    }
+  } catch (e) {}
+  document.body.removeChild(ta);
+}
+
 document.querySelectorAll('button.copy').forEach(function (button) {
   button.addEventListener('click', function () {
-    navigator.clipboard.writeText(button.dataset.copy).then(function () {
-      var label = button.textContent;
-      button.textContent = 'Copied';
-      setTimeout(function () { button.textContent = label; }, 1500);
-    });
+    copyText(button.dataset.copy, button);
+  });
+});
+
+document.querySelectorAll('form.sync-form').forEach(function (form) {
+  form.addEventListener('submit', function () {
+    var btn = form.querySelector('.sync-btn');
+    if (btn) {
+      btn.textContent = 'Syncing...';
+      btn.style.opacity = '0.7';
+      btn.style.pointerEvents = 'none';
+    }
   });
 });
 
