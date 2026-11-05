@@ -177,6 +177,7 @@ func (a *app) handler() http.Handler {
 	mux.HandleFunc("POST /setup/servers/{slug}/enabled", a.setServerEnabled)
 	mux.HandleFunc("POST /setup/servers/{slug}/refresh", a.refreshServer)
 	mux.HandleFunc("GET /setup/servers/{slug}/test-search", a.testSearch)
+	mux.HandleFunc("GET /setup/activity", a.recentActivity)
 	mux.HandleFunc("POST /setup/plex/pin", a.plexPIN)
 	mux.HandleFunc("GET /setup/plex/pin/{id}", a.plexPoll)
 	mux.HandleFunc("POST /setup/jellyfin/signin", a.jellyfinSignIn)

@@ -485,6 +485,25 @@ func (a *app) testSearch(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (a *app) recentActivity(w http.ResponseWriter, r *http.Request) {
+	now := a.Now()
+	raw := a.Registry.RecentActivity()
+	items := make([]ActivityView, 0, len(raw))
+	for _, act := range raw {
+		items = append(items, ActivityView{
+			TimeAgo: since(act.Time, now),
+			Slug:    act.Slug,
+			Server:  act.Server,
+			Kind:    act.Kind,
+			Message: act.Message,
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":         true,
+		"activities": items,
+	})
+}
+
 // ---- JSON endpoints used by the form's buttons
 
 type testRequest struct {

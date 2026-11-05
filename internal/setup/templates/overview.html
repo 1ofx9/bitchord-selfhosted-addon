@@ -61,6 +61,9 @@
     <dt>Server</dt><dd><a href="{{.ServerURL}}" target="_blank" rel="noopener" class="server-link" title="Open {{.ServerURL}} in a new tab">{{.Host}}</a>{{if .Account}} · signed in as {{.Account}}{{end}}</dd>
     <dt>Library</dt><dd>{{.Library}}</dd>
     <dt>Sync Interval</dt><dd>{{.SyncInterval}}</dd>
+    {{if .ScrobbleInfo}}
+    <dt>Scrobbling</dt><dd>{{.ScrobbleInfo}}</dd>
+    {{end}}
     <dt>Status</dt>
     <dd>
       {{if not .Enabled}}Disabled
@@ -135,7 +138,7 @@
 {{end}}
 {{end}}
 
-{{if .Activities}}
+{{if or .Activities .Servers}}
 <details class="accordion activity-accordion" style="margin-top: 1.5rem;">
   <summary>
     <span class="summary-title">
@@ -147,6 +150,7 @@
   <div class="accordion-content">
     <p class="hint" style="margin-top: 0; margin-bottom: 0.75rem;">Latest sync and playback events across your servers.</p>
     <div class="activity-list">
+      {{if .Activities}}
       {{range .Activities}}
       <div class="activity-row">
         <div class="activity-main">
@@ -156,6 +160,9 @@
         </div>
         <span class="activity-time">{{.TimeAgo}}</span>
       </div>
+      {{end}}
+      {{else}}
+      <p class="hint empty-activity" style="margin: 0.5rem 0;">No recent activity yet.</p>
       {{end}}
     </div>
   </div>
@@ -279,6 +286,61 @@ document.querySelectorAll('[data-search-slug]').forEach(function (box) {
     }
   });
 });
+
+var activityDetails = document.querySelector('.activity-accordion');
+if (activityDetails) {
+  var activityList = activityDetails.querySelector('.activity-list');
+  var activityTimer = null;
+
+  function refreshActivity() {
+    fetch('/setup/activity')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data.ok || !data.activities) return;
+        if (data.activities.length === 0) {
+          activityList.innerHTML = '<p class="hint empty-activity" style="margin: 0.5rem 0;">No recent activity yet.</p>';
+          return;
+        }
+        var html = '';
+        data.activities.forEach(function (act) {
+          html += '<div class="activity-row">' +
+            '<div class="activity-main">' +
+              '<span class="activity-server">' + escapeHTML(act.Server) + '</span>' +
+              '<span class="activity-dot">·</span>' +
+              '<span class="activity-msg">' + escapeHTML(act.Message) + '</span>' +
+            '</div>' +
+            '<span class="activity-time">' + escapeHTML(act.TimeAgo) + '</span>' +
+          '</div>';
+        });
+        activityList.innerHTML = html;
+      })
+      .catch(function () {});
+  }
+
+  activityDetails.addEventListener('toggle', function () {
+    if (activityDetails.open) {
+      refreshActivity();
+      if (!activityTimer) {
+        activityTimer = setInterval(refreshActivity, 5000);
+      }
+    } else {
+      if (activityTimer) {
+        clearInterval(activityTimer);
+        activityTimer = null;
+      }
+    }
+  });
+
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden && activityTimer) {
+      clearInterval(activityTimer);
+      activityTimer = null;
+    } else if (!document.hidden && activityDetails.open && !activityTimer) {
+      refreshActivity();
+      activityTimer = setInterval(refreshActivity, 5000);
+    }
+  });
+}
 
 function escapeHTML(str) {
   return (str || '').replace(/[&<>'"]/g, function (tag) {

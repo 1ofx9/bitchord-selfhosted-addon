@@ -83,6 +83,7 @@ type serverCard struct {
 	ScanDuration  string
 	Checked       string
 	Online        bool
+	ScrobbleInfo  string
 	Problems      string
 }
 
@@ -120,6 +121,13 @@ func (a *app) overviewView(r *http.Request, snapshot store.Snapshot) overviewVie
 			card.MaskedSyncURL = snapshot.PublicURL + "/" + server.Slug + "/••••••••••/sync"
 		}
 		card.SyncInterval = formatInterval(server.SyncInterval, a.Registry.DefaultInterval())
+		if server.Kind == store.Navidrome {
+			if server.ScrobblePercent > 0 {
+				card.ScrobbleInfo = fmt.Sprintf("Enabled (at %d%%)", server.ScrobblePercent)
+			} else {
+				card.ScrobbleInfo = "Disabled"
+			}
+		}
 		if status, ok := a.Registry.Status(server.Slug); ok {
 			card.Running, card.Status, card.Checked = true, status, since(status.Refreshed, now)
 			if status.Duration > 0 {

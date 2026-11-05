@@ -391,6 +391,9 @@ func TestServerLifecycleThroughTheForms(t *testing.T) {
 	if !strings.Contains(body, "Recent Activity") || !strings.Contains(body, "Synced 5 tracks") {
 		t.Fatalf("overview lacks recent activity: %s", body)
 	}
+	if actRec := a.get("/setup/activity"); actRec.Code != http.StatusOK || !strings.Contains(actRec.Body.String(), `"ok":true`) || !strings.Contains(actRec.Body.String(), "Synced 5 tracks") {
+		t.Fatalf("get activity endpoint failed: %d %s", actRec.Code, actRec.Body.String())
+	}
 	if searchRec := a.get("/setup/servers/plex-1/test-search?q=First+Song"); searchRec.Code != http.StatusOK || !strings.Contains(searchRec.Body.String(), `"ok":true`) {
 		t.Fatalf("test-search failed: %d %s", searchRec.Code, searchRec.Body.String())
 	}
@@ -663,6 +666,9 @@ func TestNavidromeSignInStoresTheTokenAndNeverThePassword(t *testing.T) {
 	server, _ := a.store.Snapshot().Server("navidrome-1")
 	if server.Token != fakes.NavidromeToken || server.Auth != store.AuthNavidromeSignIn || server.Account != fakes.NavidromeUser || server.Library != fakes.NavidromeMusicFolder || server.ScrobblePercent != 50 {
 		t.Fatalf("stored = %+v", server)
+	}
+	if overviewBody := a.get("/setup").Body.String(); !strings.Contains(overviewBody, "<dt>Scrobbling</dt><dd>Enabled (at 50%)</dd>") {
+		t.Fatalf("overview lacks scrobble info: %s", overviewBody)
 	}
 	moved := a.form("/setup/servers/navidrome-1", url.Values{"label": {"NAS"}, "url": {fakes.NewNavidrome(t).URL}, "enabled": {"1"}})
 	if moved.Code != http.StatusBadRequest || !strings.Contains(moved.Body.String(), "sign in again") {
