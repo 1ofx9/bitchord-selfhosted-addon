@@ -59,7 +59,7 @@ func ValidatePublicURL(raw string) error {
 func ValidateServerURL(raw string) error {
 	parsed, err := url.Parse(raw)
 	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-		return errors.New("server URL must be an http or https URL such as http://plex:32400")
+		return errors.New("server URL must be an http or https URL.")
 	}
 	host := parsed.Hostname()
 	if isCloudMetadata(host) {

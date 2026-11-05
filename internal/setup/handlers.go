@@ -445,7 +445,7 @@ func (a *app) refreshServer(w http.ResponseWriter, r *http.Request) {
 func (a *app) testSearch(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	query := r.URL.Query().Get("q")
-	res, ok := a.Registry.Search(slug, query, 20)
+	res, ok := a.Registry.Search(slug, query, 50)
 	if !ok {
 		jsonError(w, http.StatusNotFound, "server is not running or ready")
 		return
@@ -481,6 +481,7 @@ func (a *app) testSearch(w http.ResponseWriter, r *http.Request) {
 		"tokens":   res.Tokens,
 		"strict":   res.Strict,
 		"fallback": res.Fallback,
+		"total":    res.Strict + res.Fallback,
 		"tracks":   matches,
 	})
 }

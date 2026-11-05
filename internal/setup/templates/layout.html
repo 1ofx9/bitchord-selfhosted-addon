@@ -26,23 +26,45 @@
   {{end}}
 </header>
 <main>
-  {{if .Notice}}<p class="notice" role="status">{{.Notice}}</p>{{end}}
-  {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+  {{if .Notice}}
+  <div class="notice" role="status">
+    <div class="notice-main">
+      <svg class="notice-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+      <span>{{.Notice}}</span>
+    </div>
+    <button type="button" class="notice-close" aria-label="Dismiss notice">✕</button>
+  </div>
+  {{end}}
+  {{if .Error}}
+  <div class="notice error" role="alert">
+    <div class="notice-main">
+      <svg class="notice-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+      <span>{{.Error}}</span>
+    </div>
+    <button type="button" class="notice-close" aria-label="Dismiss alert">✕</button>
+  </div>
+  {{end}}
   {{template "content" .}}
 </main>
 <script>
 (function () {
-  var notice = document.querySelector('p.notice');
+  var notice = document.querySelector('.notice');
   if (!notice) return;
   if (location.search.indexOf('notice=') !== -1) {
     var url = new URL(location.href);
     url.searchParams.delete('notice');
     history.replaceState(null, '', url);
   }
-  setTimeout(function () {
+  function dismiss() {
     notice.style.opacity = '0';
-    setTimeout(function () { notice.remove(); }, 400);
-  }, 5000);
+    notice.style.transform = 'translateY(-4px)';
+    setTimeout(function () { notice.remove(); }, 300);
+  }
+  var closeBtn = notice.querySelector('.notice-close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', dismiss);
+  }
+  setTimeout(dismiss, 5000);
 })();
 </script>
 </body>
