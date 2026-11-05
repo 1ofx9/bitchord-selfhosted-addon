@@ -6,6 +6,24 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-06
+
+### Added
+
+- Segmented button selector for server types on the server form.
+- Centered, streamlined form layouts for server and password configuration.
+- Dismissible toast notifications with clear status indicators.
+- Expanded search tester preview limit with total match counts.
+
+### Changed
+
+- Simplified setup overview layout by grouping endpoint settings cleanly and removing visual clutter.
+- Improved accessibility and color contrast across light and dark themes.
+
+### Fixed
+
+- Prevent duplicate sync interval options matching the default schedule.
+
 ## [1.3.12] - 2026-11-05
 
 ### Added
