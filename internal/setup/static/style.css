@@ -32,7 +32,8 @@ body {
   accent-color: var(--strong);
 }
 
-header, main, footer { max-width: 720px; margin: 0 auto; padding: 0 20px; }
+header, main { max-width: 720px; margin: 0 auto; padding: 0 20px; }
+main { padding-bottom: 48px; }
 
 header {
   display: flex;
@@ -395,8 +396,9 @@ details.accordion .accordion-content {
 
 /* Responsive Mobile Layout Adjustments */
 @media (max-width: 640px) {
-  header, main, footer {
-    padding: 0 14px;
+  header, main {
+    padding-left: 14px;
+    padding-right: 14px;
   }
   header {
     padding-top: 16px;

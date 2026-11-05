@@ -6,6 +6,12 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ## [Unreleased]
 
+## [1.3.9] - 2026-11-05
+
+### Fixed
+
+- Added bottom padding (`48px`) to `<main>` in the setup layout so cards and accordions at the bottom have comfortable breathing room from the window edge.
+
 ## [1.3.8] - 2026-11-05
 
 ### Changed
