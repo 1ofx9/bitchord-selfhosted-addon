@@ -584,11 +584,11 @@ func TestRegistryActivity(t *testing.T) {
 		t.Errorf("unexpected order of activities: %+v", recent)
 	}
 
-	// Verify ring buffer limit of 20
-	for i := 0; i < 25; i++ {
+	// Verify ring buffer limit of 30
+	for i := 0; i < 35; i++ {
 		r.RecordActivity("server-1", "My Server", "test", fmt.Sprintf("event %d", i))
 	}
-	if len(r.RecentActivity()) != 20 {
-		t.Errorf("expected activity ring buffer capped at 20, got %d", len(r.RecentActivity()))
+	if len(r.RecentActivity()) != 30 {
+		t.Errorf("expected activity ring buffer capped at 30, got %d", len(r.RecentActivity()))
 	}
 }

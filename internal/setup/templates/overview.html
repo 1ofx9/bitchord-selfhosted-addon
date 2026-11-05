@@ -38,7 +38,7 @@
 {{if .Servers}}
 {{range .Servers}}
 <section class="card server" id="server-{{.Slug}}">
-  <div class="row" style="align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+  <div class="row server-header" style="align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
     <h2 style="margin: 0;">{{.Name}} <small>{{.Slug}}</small></h2>
     {{if .Enabled}}
       {{if .Online}}
@@ -67,18 +67,24 @@
       {{else}}Building the index{{end}}
     </dd>
     <dt>BitChord URL</dt>
-    <dd class="row" style="flex-wrap: nowrap;">{{if .URL}}<code class="url" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{.MaskedURL}}</code> <button type="button" class="copy" data-copy="{{.URL}}" style="flex-shrink: 0;" aria-label="Copy the BitChord URL for {{.Name}}">Copy</button>{{else}}Set the public URL first{{end}}</dd>
+    <dd class="row" style="flex-wrap: nowrap;">{{if .URL}}<code class="url" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;">{{.MaskedURL}}</code> <button type="button" class="copy" data-copy="{{.URL}}" style="flex-shrink: 0;" aria-label="Copy the BitChord URL for {{.Name}}">Copy</button>{{else}}Set the public URL first{{end}}</dd>
     <dt>Sync Webhook</dt>
-    <dd class="row" style="flex-wrap: nowrap;">{{if .SyncURL}}<code class="url" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{.MaskedSyncURL}}</code> <button type="button" class="copy" data-copy="{{.SyncURL}}" style="flex-shrink: 0;" aria-label="Copy the Sync Webhook URL for {{.Name}}">Copy</button>{{else}}Set the public URL first{{end}}</dd>
+    <dd class="row" style="flex-wrap: nowrap;">{{if .SyncURL}}<code class="url" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;">{{.MaskedSyncURL}}</code> <button type="button" class="copy" data-copy="{{.SyncURL}}" style="flex-shrink: 0;" aria-label="Copy the Sync Webhook URL for {{.Name}}">Copy</button>{{else}}Set the public URL first{{end}}</dd>
     {{if .SyncURL}}
-    <dd style="grid-column: 1 / -1; margin-top: -0.25rem; margin-bottom: 0.5rem;">
-      <details style="font-size: 0.85em; color: var(--muted);">
-        <summary style="cursor: pointer; user-select: none;">Webhook helper &amp; curl command</summary>
-        <div style="margin-top: 0.4rem; padding: 0.6rem 0.8rem; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 4px;">
-          <p style="margin: 0 0 0.4rem 0;">Trigger instant sync from terminal, script, or cron:</p>
+    <dd style="grid-column: 1 / -1; margin-top: 0.25rem;">
+      <details class="accordion webhook-helper" style="margin-top: 0.35rem;">
+        <summary>
+          <span class="summary-title">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" style="opacity: 0.7;"><path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1.002 1.002 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4.018 4.018 0 0 1-.128-1.287z"/><path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 0 0-4.243-4.243L6.586 4.672z"/></svg>
+            Webhook helper &amp; curl command
+          </span>
+          <svg class="chevron" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06z"/></svg>
+        </summary>
+        <div class="accordion-content">
+          <p class="hint" style="margin: 0 0 0.5rem 0;">Trigger instant sync from terminal, script, or cron:</p>
           <div class="row" style="flex-wrap: nowrap; gap: 0.5rem;">
-            <code style="overflow-x: auto; white-space: nowrap; flex: 1; padding: 0.3rem 0.5rem; background: var(--bg); border: 1px solid var(--border); border-radius: 3px;">curl -X POST "{{.MaskedSyncURL}}"</code>
-            <button type="button" class="copy secondary" data-copy="curl -X POST &quot;{{.SyncURL}}&quot;" style="flex-shrink: 0; padding: 0.2rem 0.6rem; font-size: 0.85em;">Copy curl</button>
+            <code style="overflow-x: auto; white-space: nowrap; flex: 1; min-width: 0; padding: 0.4rem 0.6rem; background: var(--bg); border: 1px solid var(--border); border-radius: 4px;">curl -X POST "{{.MaskedSyncURL}}"</code>
+            <button type="button" class="copy secondary" data-copy="curl -X POST &quot;{{.SyncURL}}&quot;" style="flex-shrink: 0; font-size: 0.85em;">Copy curl</button>
           </div>
         </div>
       </details>
@@ -104,15 +110,21 @@
     </form>
   </div>
   {{if and .Enabled .Running}}
-  <details class="search-box" style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
-    <summary style="cursor: pointer; font-weight: 500;">Search tester</summary>
-    <div style="margin-top: 0.5rem;" data-search-slug="{{.Slug}}">
-      <p class="hint">Test how track queries are tokenized and matched against this server's index.</p>
-      <div class="row">
-        <input type="text" class="search-q" placeholder="e.g. timebomb all time low">
+  <details class="accordion search-box">
+    <summary>
+      <span class="summary-title">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" style="opacity: 0.7;"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/></svg>
+        Search tester
+      </span>
+      <svg class="chevron" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06z"/></svg>
+    </summary>
+    <div class="accordion-content" data-search-slug="{{.Slug}}">
+      <p class="hint" style="margin-top: 0; margin-bottom: 0.5rem;">Test how track queries are tokenized and matched against this server's index.</p>
+      <div class="row" style="margin-top: 6px;">
+        <input type="text" class="search-q" placeholder="Search tracks, artists, or albums..." style="flex: 1;">
         <button type="button" class="search-run secondary">Test</button>
       </div>
-      <div class="search-results" style="margin-top: 0.5rem;" hidden></div>
+      <div class="search-results" style="margin-top: 10px;" hidden></div>
     </div>
   </details>
   {{end}}
@@ -121,22 +133,30 @@
 {{end}}
 
 {{if .Activities}}
-<section class="card" style="margin-top: 1.5rem;">
-  <h2>Recent Activity</h2>
-  <p class="hint" style="margin-top: -0.5rem; margin-bottom: 0.75rem;">Latest sync and scrobble events across your servers.</p>
-  <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-    {{range .Activities}}
-    <div class="row" style="align-items: baseline; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; font-size: 0.9em;">
-      <div>
-        <span style="font-weight: 600; color: var(--text);">{{.Server}}</span>
-        <span style="color: var(--muted); margin: 0 4px;">·</span>
-        <span>{{.Message}}</span>
+<details class="accordion activity-accordion" style="margin-top: 1.5rem;">
+  <summary>
+    <span class="summary-title">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" style="opacity: 0.7;"><path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/></svg>
+      Recent Activity
+    </span>
+    <svg class="chevron" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06z"/></svg>
+  </summary>
+  <div class="accordion-content">
+    <p class="hint" style="margin-top: 0; margin-bottom: 0.75rem;">Latest sync and playback events across your servers.</p>
+    <div class="activity-list">
+      {{range .Activities}}
+      <div class="activity-row">
+        <div class="activity-main">
+          <span class="activity-server">{{.Server}}</span>
+          <span class="activity-dot">·</span>
+          <span class="activity-msg">{{.Message}}</span>
+        </div>
+        <span class="activity-time">{{.TimeAgo}}</span>
       </div>
-      <span style="color: var(--muted); font-size: 0.85em; flex-shrink: 0; margin-left: 1rem;">{{.TimeAgo}}</span>
+      {{end}}
     </div>
-    {{end}}
   </div>
-</section>
+</details>
 {{end}}
 
 <script>
@@ -169,31 +189,42 @@ document.querySelectorAll('[data-search-slug]').forEach(function (box) {
     if (!q) return;
     btn.disabled = true;
     out.hidden = false;
-    out.textContent = 'Searching...';
+    out.innerHTML = '<p class="hint" style="margin: 0.5rem 0;">Searching...</p>';
     fetch('/setup/servers/' + encodeURIComponent(slug) + '/test-search?q=' + encodeURIComponent(q))
       .then(function (r) { return r.json(); })
       .then(function (data) {
         btn.disabled = false;
         if (!data.ok) {
-          out.textContent = 'Error: ' + (data.error || 'unknown');
+          out.innerHTML = '<p class="error" style="margin: 0.5rem 0;">Error: ' + escapeHTML(data.error || 'unknown') + '</p>';
           return;
         }
-        var summary = 'Tokens: ' + JSON.stringify(data.tokens) + ' · Strict: ' + data.strict + ' · Fallback: ' + data.fallback;
+        var summary = '<div class="search-summary">' +
+          '<span>Tokens: <code>' + escapeHTML(JSON.stringify(data.tokens)) + '</code></span> · ' +
+          '<span>Strict: <strong>' + data.strict + '</strong></span> · ' +
+          '<span>Fallback: <strong>' + data.fallback + '</strong></span>' +
+        '</div>';
         if (!data.tracks || data.tracks.length === 0) {
-          out.innerHTML = '<p class="hint">' + escapeHTML(summary) + '</p><p>No matching tracks found in index.</p>';
+          out.innerHTML = summary + '<p class="hint" style="margin-top: 0.5rem;">No matching tracks found in index.</p>';
           return;
         }
-        var html = '<p class="hint">' + escapeHTML(summary) + '</p><ul style="padding-left: 1.2rem; margin: 0.25rem 0;">';
+        var html = summary + '<div class="search-track-list">';
         data.tracks.forEach(function (t) {
           var qual = t.lossless ? 'LOSSLESS' : (t.codec || '');
-          html += '<li><strong>' + escapeHTML(t.title) + '</strong> — ' + escapeHTML(t.artist) + ' <em>(' + escapeHTML(t.album) + ')</em> <small>[' + escapeHTML(qual) + ' · ' + t.duration + 's]</small></li>';
+          var extra = t.duration ? ' · ' + t.duration + 's' : '';
+          html += '<div class="search-track-item">' +
+            '<div class="search-track-info">' +
+              '<span class="search-track-title">' + escapeHTML(t.title) + '</span>' +
+              '<span class="search-track-meta">— ' + escapeHTML(t.artist) + ' <em>(' + escapeHTML(t.album) + ')</em></span>' +
+            '</div>' +
+            '<span class="search-track-badge">' + escapeHTML(qual + extra) + '</span>' +
+          '</div>';
         });
-        html += '</ul>';
+        html += '</div>';
         out.innerHTML = html;
       })
       .catch(function (err) {
         btn.disabled = false;
-        out.textContent = 'Error: ' + err.message;
+        out.innerHTML = '<p class="error" style="margin: 0.5rem 0;">Error: ' + escapeHTML(err.message) + '</p>';
       });
   }
   btn.addEventListener('click', runSearch);

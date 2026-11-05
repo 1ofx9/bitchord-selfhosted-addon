@@ -127,6 +127,9 @@ func serve(ctx context.Context, cfg config.Config, st *store.Store, log *slog.Lo
 	}()
 	mux.Handle("/setup", admin)
 	mux.Handle("/setup/", admin)
+	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/setup", http.StatusFound)
+	})
 	mux.Handle("/", server.New(server.Options{
 		Site: func() server.Site {
 			current := st.Snapshot()

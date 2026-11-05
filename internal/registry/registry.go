@@ -172,8 +172,8 @@ func (r *Registry) RecordActivity(slug, server, kind, message string) {
 		Message: message,
 	}
 	r.activities = append([]Activity{act}, r.activities...)
-	if len(r.activities) > 20 {
-		r.activities = r.activities[:20]
+	if len(r.activities) > 30 {
+		r.activities = r.activities[:30]
 	}
 }
 

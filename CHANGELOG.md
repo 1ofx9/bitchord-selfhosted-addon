@@ -6,6 +6,19 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ## [Unreleased]
 
+## [1.3.7] - 2026-11-05
+
+### Added
+
+- Automatic root redirect. Navigating to the server root (`/`) now automatically redirects (`302 Found`) to the `/setup` admin dashboard, preserving origin and protocol.
+- Collapsible accordion components for Search tester, Webhook helper, and Recent Activity with smooth chevron animations.
+- Fully responsive mobile layout for `/setup`, including flex-wrapped server action buttons and responsive metadata lists.
+
+### Changed
+
+- Expanded recent activity event history ring buffer capacity from 20 to 30 entries.
+- Streamlined Search tester with a generic placeholder and simplified the Recent Activity header.
+
 ## [1.3.6] - 2026-11-04
 
 ### Fixed
