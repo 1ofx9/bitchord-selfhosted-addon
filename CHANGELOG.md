@@ -6,6 +6,13 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ## [Unreleased]
 
+## [1.3.12] - 2026-11-05
+
+### Added
+
+- Display scrobbling status (`Enabled (at 50%)` or `Disabled`) on Navidrome server cards in the setup overview.
+- Live background updates and `GET /setup/activity` endpoint for the Recent Activity feed, keeping events fresh without requiring a page reload.
+
 ## [1.3.11] - 2026-11-05
 
 ### Added
