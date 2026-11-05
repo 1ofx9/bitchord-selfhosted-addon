@@ -86,7 +86,7 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 - Incomplete word and prefix matching in search index. Queries such as `"on kann"` now reliably match `"On Kanna Vachi"` (and `"teddy swi"` matches `"Teddy Swims"`), enabling natural search-as-you-type and partial token lookups.
 - Fallback noise and metadata token stripping in search index. Queries containing variant words (`live`, `remaster`, `remastered`, `deluxe`, `acoustic`, `bonus`, `feat`, `ft`, `version`, `edit`, `mix`) or 4-digit release years (e.g. `2020`) automatically strip noise tokens when strict search yields no results.
-- Real-time server connectivity status badge on the `/setup` overview dashboard. Each server card now displays a live status indicator (`🟢 Online`, `🔴 Unreachable`, or `Disabled`) indicating immediate health and connectivity.
+- Real-time server connectivity status badge on the `/setup` overview dashboard. Each server card now displays a live status indicator (`Online`, `Unreachable`, or `Disabled`) indicating immediate health and connectivity.
 - Detailed library sync completion notice. Clicking "Sync now" or triggering a manual refresh displays an informative flash banner with scan duration and exact track, artist, and album counts (e.g. `Navidrome synced in 850ms (756 tracks · 94 artists · 68 albums).`).
 
 ## [1.3.3] - 2026-11-04
@@ -114,7 +114,7 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 - Mask the sync webhook URL on the setup overview dashboard (`https://.../<slug>/••••••••••/sync`), preventing secret exposure on screen while keeping full URL copying intact.
 - Keep the "Copy" buttons for BitChord and Sync Webhook URLs aligned horizontally without wrapping onto new lines.
-- Fix Scrobble threshold slider text alignment in the server setup form so "Scrobble threshold: X% of track" renders on a single line.
+- Fix scrobble threshold slider text alignment in the server setup form so "Scrobble threshold: X% of track" renders on a single line.
 - Hide the "Paste a token" tab when Navidrome / Subsonic is selected to avoid confusion, since Subsonic servers authenticate via username and password.
 - Display the configured default duration (e.g. `Default (15m)`) on both the overview dashboard and server form dropdown.
 
