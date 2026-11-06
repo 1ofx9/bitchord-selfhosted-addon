@@ -397,6 +397,14 @@ func TestServerLifecycleThroughTheForms(t *testing.T) {
 	if searchRec := a.get("/setup/servers/plex-1/test-search?q=First+Song"); searchRec.Code != http.StatusOK || !strings.Contains(searchRec.Body.String(), `"ok":true`) {
 		t.Fatalf("test-search failed: %d %s", searchRec.Code, searchRec.Body.String())
 	}
+	if searchRec := a.get("/setup/servers/plex-1/search?q=First+Song"); searchRec.Code != http.StatusOK || !strings.Contains(searchRec.Body.String(), `"albums"`) {
+		t.Fatalf("search endpoint failed: %d %s", searchRec.Code, searchRec.Body.String())
+	}
+	// Strict search tester: searching an album name ("As You Found Me") returns the album, but 0 songs because no track title matches.
+	albumSearchRec := a.get("/setup/servers/plex-1/test-search?q=As+You+Found+Me")
+	if albumSearchRec.Code != http.StatusOK || !strings.Contains(albumSearchRec.Body.String(), `"name":"As You Found Me"`) || !strings.Contains(albumSearchRec.Body.String(), `"tracks":[]`) {
+		t.Fatalf("strict test-search failed: %d %s", albumSearchRec.Code, albumSearchRec.Body.String())
+	}
 	if searchRec := a.get("/setup/servers/plex-9/test-search?q=First+Song"); searchRec.Code != http.StatusNotFound {
 		t.Fatalf("test-search unknown server: %d", searchRec.Code)
 	}

@@ -12,6 +12,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/rairulyle/bitchord-selfhosted-addon/internal/library"
 	"github.com/rairulyle/bitchord-selfhosted-addon/internal/media"
 	"github.com/rairulyle/bitchord-selfhosted-addon/internal/registry"
 	"github.com/rairulyle/bitchord-selfhosted-addon/internal/store"
@@ -460,21 +461,78 @@ func (a *app) testSearch(w http.ResponseWriter, r *http.Request) {
 		BitDepth    int    `json:"bitDepth,omitempty"`
 		SampleRate  int    `json:"sampleRate,omitempty"`
 		Lossless    bool   `json:"lossless"`
+		ArtworkURL  string `json:"artworkURL,omitempty"`
 	}
-	matches := make([]matchTrack, len(res.Tracks))
-	for i, t := range res.Tracks {
-		matches[i] = matchTrack{
+	type matchAlbum struct {
+		Name       string `json:"name"`
+		Artist     string `json:"artist"`
+		ArtworkURL string `json:"artworkURL,omitempty"`
+		TrackCount int    `json:"trackCount"`
+		Year       int    `json:"year,omitempty"`
+	}
+	type matchArtist struct {
+		Name       string `json:"name"`
+		ArtworkURL string `json:"artworkURL,omitempty"`
+		TrackCount int    `json:"trackCount"`
+	}
+
+	snapshot := a.Store.Snapshot()
+	base := ""
+	if snapshot.PublicURL != "" && snapshot.Secret != "" {
+		base = snapshot.PublicURL + "/" + slug + "/" + snapshot.Secret
+	}
+
+	matches := make([]matchTrack, 0, len(res.Tracks))
+	for _, t := range res.Tracks {
+		if !library.TitleMatches(t.Title, query) {
+			continue
+		}
+		art := ""
+		if t.ArtRef != "" && base != "" {
+			art = base + "/art/" + t.ID
+		}
+		matches = append(matches, matchTrack{
 			ID:          t.ID,
 			Title:       t.Title,
-			Artist:      t.Artist,
+			Artist:      library.FormatArtists(t.Artist),
 			Album:       t.Album,
 			DurationSec: t.DurationSec,
 			Codec:       t.Codec,
 			BitDepth:    t.BitDepth,
 			SampleRate:  t.SampleRate,
 			Lossless:    media.Lossless(t.Codec),
+			ArtworkURL:  art,
+		})
+	}
+
+	albums := make([]matchAlbum, len(res.Albums))
+	for i, alb := range res.Albums {
+		art := ""
+		if alb.ArtRef != "" && alb.SampleID != "" && base != "" {
+			art = base + "/art/" + alb.SampleID
+		}
+		albums[i] = matchAlbum{
+			Name:       alb.Name,
+			Artist:     library.FormatArtists(alb.Artist),
+			ArtworkURL: art,
+			TrackCount: alb.TrackCount,
+			Year:       alb.Year,
 		}
 	}
+
+	artists := make([]matchArtist, len(res.Artists))
+	for i, art := range res.Artists {
+		artURL := ""
+		if art.ArtRef != "" && art.SampleID != "" && base != "" {
+			artURL = base + "/art/" + art.SampleID
+		}
+		artists[i] = matchArtist{
+			Name:       art.Name,
+			ArtworkURL: artURL,
+			TrackCount: art.TrackCount,
+		}
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":       true,
 		"query":    query,
@@ -483,6 +541,8 @@ func (a *app) testSearch(w http.ResponseWriter, r *http.Request) {
 		"fallback": res.Fallback,
 		"total":    res.Strict + res.Fallback,
 		"tracks":   matches,
+		"albums":   albums,
+		"artists":  artists,
 	})
 }
 

@@ -212,10 +212,12 @@ func (r *Registry) Refresh(ctx context.Context, slug string) error {
 }
 
 type SearchResult struct {
-	Strict   int           `json:"strict"`
-	Fallback int           `json:"fallback"`
-	Tokens   []string      `json:"tokens"`
-	Tracks   []media.Track `json:"tracks"`
+	Strict   int                   `json:"strict"`
+	Fallback int                   `json:"fallback"`
+	Tokens   []string              `json:"tokens"`
+	Tracks   []media.Track         `json:"tracks"`
+	Albums   []library.AlbumMatch  `json:"albums"`
+	Artists  []library.ArtistMatch `json:"artists"`
 }
 
 // Search queries a server's in-memory index directly for testing and diagnostics.
@@ -231,6 +233,8 @@ func (r *Registry) Search(slug, query string, limit int) (SearchResult, bool) {
 		Fallback: res.Fallback,
 		Tokens:   tokens,
 		Tracks:   res.Tracks,
+		Albums:   res.Albums,
+		Artists:  res.Artists,
 	}, true
 }
 

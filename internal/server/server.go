@@ -7,11 +7,13 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"os"
 	"path"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/rairulyle/bitchord-selfhosted-addon/internal/bitchordauth"
 	"github.com/rairulyle/bitchord-selfhosted-addon/internal/library"
 	"github.com/rairulyle/bitchord-selfhosted-addon/internal/media"
 	"github.com/rairulyle/bitchord-selfhosted-addon/internal/registry"
@@ -36,15 +38,17 @@ type Options struct {
 	Registry Registry
 	Version  string
 	Log      *slog.Logger
+	Auth     *bitchordauth.Auth
 }
 
 type server struct {
 	Options
 	lookupTimeout time.Duration
+	auth          *bitchordauth.Auth
 }
 
 // source is one server resolved from the request path, with the base of its
-// own URLs.
+// public URLs so endpoints can generate their own links without hardcoding.
 type source struct {
 	*registry.Entry
 	base string
@@ -53,7 +57,30 @@ type source struct {
 func New(o Options) http.Handler { return newServer(o).handler() }
 
 func newServer(o Options) *server {
-	return &server{Options: o, lookupTimeout: 2500 * time.Millisecond}
+	auth := o.Auth
+	if auth == nil {
+		mode := os.Getenv("BITCHORD_AUTH_MODE")
+		if mode == "" {
+			mode = "enforce"
+		}
+		var hosts []string
+		if envHosts := os.Getenv("BITCHORD_HOSTS"); envHosts != "" {
+			for _, h := range strings.Split(envHosts, ",") {
+				if norm := bitchordauth.NormalizeHost(h); norm != "" {
+					hosts = append(hosts, norm)
+				}
+			}
+		}
+		auth = bitchordauth.New(bitchordauth.Options{
+			Hosts: hosts,
+			Mode:  mode,
+		})
+	}
+	return &server{
+		Options:       o,
+		lookupTimeout: 2500 * time.Millisecond,
+		auth:          auth,
+	}
 }
 
 func (s *server) handler() http.Handler {
@@ -65,7 +92,9 @@ func (s *server) handler() http.Handler {
 	mux.HandleFunc("GET /{slug}/{secret}/sync", s.guard(s.syncWebhook))
 	mux.HandleFunc("GET /{slug}/{secret}/stream/{id}", s.guard(s.stream))
 	mux.HandleFunc("GET /{slug}/{secret}/file/{id}", s.guard(s.file))
+	mux.HandleFunc("HEAD /{slug}/{secret}/file/{id}", s.guard(s.file))
 	mux.HandleFunc("GET /{slug}/{secret}/art/{id}", s.guard(s.art))
+	mux.HandleFunc("HEAD /{slug}/{secret}/art/{id}", s.guard(s.art))
 	mux.HandleFunc("OPTIONS /{slug}/{secret}/{rest...}", s.guard(s.preflight))
 	mux.HandleFunc("/", quiet404)
 	return s.logged(cors(cleanOnly(mux)))
@@ -101,6 +130,38 @@ func (s *server) guard(next func(http.ResponseWriter, *http.Request, source)) ht
 	}
 }
 
+func (s *server) checkAuth(w http.ResponseWriter, r *http.Request, src source) bool {
+	if s.auth == nil || s.auth.Mode() == "disabled" {
+		return true
+	}
+	site := s.Site()
+	if site.PublicURL != "" {
+		if norm := bitchordauth.NormalizeHost(site.PublicURL); norm != "" {
+			hosts := s.auth.Hosts()
+			has := false
+			for _, h := range hosts {
+				if h == norm {
+					has = true
+					break
+				}
+			}
+			if !has {
+				s.auth.SetHosts(append(hosts, norm))
+			}
+		}
+	}
+	res := s.auth.VerifyRequest(r)
+	if res.OK {
+		return true
+	}
+	if s.auth.Mode() == "log" {
+		src.Log.Warn("bitchord-auth would refuse request", "error", res.Error, "message", res.Message)
+		return true
+	}
+	res.WriteRejection(w)
+	return false
+}
+
 func quiet404(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNotFound) }
 
 func cors(next http.Handler) http.Handler {
@@ -113,7 +174,7 @@ func cors(next http.Handler) http.Handler {
 
 func (s *server) preflight(w http.ResponseWriter, _ *http.Request, _ source) {
 	w.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Range, If-Range, Content-Type")
+	w.Header().Set("Access-Control-Allow-Headers", "Range, If-Range, Content-Type, X-BitChord-Token, X-BitChord-Proof")
 	w.Header().Set("Access-Control-Max-Age", "86400")
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -128,17 +189,21 @@ func (s *server) health(w http.ResponseWriter, _ *http.Request) {
 
 func (s *server) manifest(w http.ResponseWriter, _ *http.Request, src source) {
 	writeJSON(w, manifestJSON{
-		ID:          "app.bitchord-selfhosted-addon." + src.Slug,
-		Name:        src.DisplayName(),
-		Version:     s.Version,
-		Description: "Your " + src.Backend.Name() + " music library",
-		Resources:   []string{"search", "stream"},
-		Types:       []string{"track"},
-		ContentType: "music",
+		ID:           "app.bitchord-selfhosted-addon." + src.Slug,
+		Name:         src.DisplayName(),
+		Version:      s.Version,
+		Description:  "Your " + src.Backend.Name() + " music library",
+		Resources:    []string{"search", "stream"},
+		Types:        []string{"track"},
+		ContentType:  "music",
+		BitchordAuth: true,
 	})
 }
 
 func (s *server) search(w http.ResponseWriter, r *http.Request, src source) {
+	if !s.checkAuth(w, r, src) {
+		return
+	}
 	started := time.Now()
 	query := r.URL.Query().Get("q")
 	found := src.Library.Find(query, searchLimit)
@@ -146,8 +211,44 @@ func (s *server) search(w http.ResponseWriter, r *http.Request, src source) {
 	for i, track := range found.Tracks {
 		tracks[i] = toTrackJSON(src.base, track)
 	}
+
+	albums := make([]albumJSON, len(found.Albums))
+	for i, alb := range found.Albums {
+		art := ""
+		if alb.ArtRef != "" && alb.SampleID != "" {
+			art = src.base + "/art/" + alb.SampleID
+		}
+		albums[i] = albumJSON{
+			ID:         alb.SampleID,
+			Title:      alb.Name,
+			Artist:     alb.Artist,
+			ArtworkURL: art,
+			TrackCount: alb.TrackCount,
+			Year:       alb.Year,
+		}
+	}
+
+	artists := make([]artistJSON, len(found.Artists))
+	for i, art := range found.Artists {
+		artURL := ""
+		if art.ArtRef != "" && art.SampleID != "" {
+			artURL = src.base + "/art/" + art.SampleID
+		}
+		artists[i] = artistJSON{
+			ID:         art.SampleID,
+			Name:       art.Name,
+			ArtworkURL: artURL,
+			TrackCount: art.TrackCount,
+		}
+	}
+
 	logSearch(src.Log, query, found, time.Since(started))
-	writeJSON(w, searchJSON{Tracks: tracks, Albums: []any{}, Artists: []any{}, Playlists: []any{}})
+	writeJSON(w, searchJSON{
+		Tracks:    tracks,
+		Albums:    albums,
+		Artists:   artists,
+		Playlists: []any{},
+	})
 }
 
 func (s *server) syncWebhook(w http.ResponseWriter, r *http.Request, src source) {

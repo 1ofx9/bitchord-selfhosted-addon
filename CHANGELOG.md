@@ -6,6 +6,24 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ## [Unreleased]
 
+### Added
+
+- Support for BitChord 1.9.1 Addon Auth protocol v1 (`bitchordAuth: true` in `manifest.json`, offline JWKS token and ECDSA P-256 device proof verification via `X-BitChord-Token` and `X-BitChord-Proof`).
+- Maximum security out of the box: defaults to `enforce` mode (with configurable `BITCHORD_AUTH_MODE=enforce|log|disabled` and `BITCHORD_HOSTS`).
+- Short-lived HMAC-SHA256 signed media playback URLs (`/file/{id}?exp=...&sig=...`) with 30-minute validity and cryptographic tamper protection.
+- Comprehensive search engine overhaul mirroring BitChord client behavior: multi-word substring and prefix matching (e.g. `wee` -> `Sweet`, `frank oce` -> `Frank Ocean`), exact and partial token ranking, and multi-entity extraction.
+- Strict entity search isolation: albums and artists are strictly matched against their own names (`score > 0`), preventing unrelated entities from leaking into result lists.
+- Strict title matching in Search Tester for songs (`library.TitleMatches`), ensuring song previews only surface tracks whose title matches query tokens.
+- Multi-artist parsing and index consolidation: composite artist tags separated by `;`, `•`, `|`, or ` / ` are parsed into individual artist entries, eliminating fragmented combo profiles and correctly attributing collaborative tracks.
+- Standardized multi-artist display formatting across song rows and album cards using ` • `.
+- Category support in search responses: returns distinct matching `albums` and `artists` alongside `tracks`.
+- Overhauled `/setup` Search Tester UI with category tabs (`[ All ] [ Songs ] [ Albums ] [ Artists ]`), live debounced search as you type, rich cover art thumbnails, album grid cards, and unified full-width artist list rows mirroring song items.
+
+### Fixed
+
+- Prevent `JSON.parse` syntax errors in the search tester by registering both `/setup/servers/{slug}/test-search` and `/setup/servers/{slug}/search` routes and enforcing HTTP response validation.
+- Fix prefix search truncation where exact word matches terminated prefix candidate expansion early (e.g. searching `lose` finding both `Lose My Mind` and `Loser`).
+
 ## [1.4.0] - 2026-11-06
 
 ### Added

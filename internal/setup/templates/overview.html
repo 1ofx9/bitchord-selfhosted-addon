@@ -172,6 +172,12 @@
         </div>
         <button type="button" class="secondary search-run">Search</button>
       </div>
+      <div class="search-tabs" role="tablist" aria-label="Search filter">
+        <button type="button" class="search-tab active" data-tab="all" role="tab" aria-selected="true">All</button>
+        <button type="button" class="search-tab" data-tab="songs" role="tab" aria-selected="false">Songs</button>
+        <button type="button" class="search-tab" data-tab="albums" role="tab" aria-selected="false">Albums</button>
+        <button type="button" class="search-tab" data-tab="artists" role="tab" aria-selected="false">Artists</button>
+      </div>
       <div class="search-output"></div>
     </div>
   </details>
@@ -278,27 +284,47 @@
   });
 })();
 
-document.querySelectorAll('.search-input-row').forEach(function (row) {
+document.querySelectorAll('.accordion.search-box').forEach(function (box) {
+  var row = box.querySelector('.search-input-row');
+  if (!row) return;
   var slug = row.dataset.searchSlug;
   var input = row.querySelector('.search-q');
   var btn = row.querySelector('.search-run');
   var clearBtn = row.querySelector('.search-clear');
-  var out = row.parentElement.querySelector('.search-output');
+  var out = box.querySelector('.search-output');
+  var tabs = box.querySelectorAll('.search-tab');
+  var activeTab = 'all';
+  var lastData = null;
+  var debounceTimer = null;
 
   function updateClearVisibility() {
     clearBtn.style.display = input.value.trim() ? 'inline-flex' : 'none';
   }
 
-  input.addEventListener('input', updateClearVisibility);
-
   function clearSearch() {
     input.value = '';
     out.innerHTML = '';
+    lastData = null;
     updateClearVisibility();
     input.focus();
   }
 
   clearBtn.addEventListener('click', clearSearch);
+
+  tabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      tabs.forEach(function (t) {
+        t.classList.remove('active');
+        t.setAttribute('aria-selected', 'false');
+      });
+      tab.classList.add('active');
+      tab.setAttribute('aria-selected', 'true');
+      activeTab = tab.dataset.tab;
+      if (lastData) {
+        renderResults();
+      }
+    });
+  });
 
   function formatDuration(sec) {
     if (!sec || sec <= 0) return '';
@@ -307,82 +333,217 @@ document.querySelectorAll('.search-input-row').forEach(function (row) {
     return m + ':' + (s < 10 ? '0' : '') + s;
   }
 
+  var songIconSvg = '<svg class="search-fallback-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
+  var albumIconSvg = '<svg class="search-fallback-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>';
+  var artistIconSvg = '<svg class="search-fallback-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+
+  function formatArtists(str) {
+    if (!str) return '';
+    return str.replace(/\s*[;•|]\s*|\s+\/\s+/g, ' • ').trim();
+  }
+
+  function renderTrackItem(t) {
+    var qual = t.lossless ? 'LOSSLESS' : (t.codec || '');
+    var dur = formatDuration(t.duration);
+    var metaParts = [];
+    if (t.artist) metaParts.push(escapeHTML(formatArtists(t.artist)));
+    if (t.album) metaParts.push('<em>' + escapeHTML(t.album) + '</em>');
+    var metaStr = metaParts.length > 0 ? metaParts.join(' · ') : '';
+
+    var badgeContent = '';
+    if (qual) badgeContent += '<span class="badge-quality">' + escapeHTML(qual) + '</span>';
+    if (dur) badgeContent += '<span class="badge-duration">' + escapeHTML(dur) + '</span>';
+
+    var artHTML = t.artworkURL
+      ? '<img class="search-thumb" src="' + escapeHTML(t.artworkURL) + '" alt="" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';"><div class="search-fallback-wrap" style="display:none">' + songIconSvg + '</div>'
+      : '<div class="search-fallback-wrap">' + songIconSvg + '</div>';
+
+    return '<div class="search-track-item">' +
+      '<div class="search-media-left">' +
+        artHTML +
+        '<div class="search-track-info">' +
+          '<span class="search-track-title">' + escapeHTML(t.title) + '</span>' +
+          (metaStr ? '<span class="search-track-meta">' + metaStr + '</span>' : '') +
+        '</div>' +
+      '</div>' +
+      (badgeContent ? '<span class="search-track-badge">' + badgeContent + '</span>' : '') +
+    '</div>';
+  }
+
+  function renderAlbumCard(alb) {
+    var artHTML = alb.artworkURL
+      ? '<img class="search-album-art" src="' + escapeHTML(alb.artworkURL) + '" alt="" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';"><div class="search-fallback-wrap album-fallback" style="display:none">' + albumIconSvg + '</div>'
+      : '<div class="search-fallback-wrap album-fallback">' + albumIconSvg + '</div>';
+
+    var subParts = [];
+    if (alb.artist) subParts.push(escapeHTML(formatArtists(alb.artist)));
+    if (alb.year) subParts.push(alb.year);
+    if (alb.trackCount) subParts.push(alb.trackCount + (alb.trackCount === 1 ? ' track' : ' tracks'));
+
+    return '<div class="search-album-card">' +
+      '<div class="search-album-art-wrap">' + artHTML + '</div>' +
+      '<div class="search-album-name" title="' + escapeHTML(alb.name) + '">' + escapeHTML(alb.name) + '</div>' +
+      '<div class="search-album-sub" title="' + escapeHTML(subParts.join(' · ')) + '">' + escapeHTML(subParts.join(' · ')) + '</div>' +
+    '</div>';
+  }
+
+  function renderArtistItem(art) {
+    var artHTML = art.artworkURL
+      ? '<img class="search-thumb search-artist-thumb" src="' + escapeHTML(art.artworkURL) + '" alt="" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';"><div class="search-fallback-wrap artist-fallback" style="display:none">' + artistIconSvg + '</div>'
+      : '<div class="search-fallback-wrap artist-fallback">' + artistIconSvg + '</div>';
+
+    var countText = (art.trackCount || 1) + (art.trackCount === 1 ? ' track in library' : ' tracks in library');
+
+    return '<div class="search-track-item search-artist-item">' +
+      '<div class="search-media-left">' +
+        artHTML +
+        '<div class="search-track-info">' +
+          '<span class="search-track-title">' + escapeHTML(art.name) + '</span>' +
+          '<span class="search-track-meta">Artist</span>' +
+        '</div>' +
+      '</div>' +
+      '<span class="search-track-badge"><span class="badge-duration">' + escapeHTML(countText) + '</span></span>' +
+    '</div>';
+  }
+
+  function renderResults() {
+    if (!lastData) return;
+    var data = lastData;
+
+    var tokenList = (data.tokens || []).map(function (tk) {
+      return '<code>' + escapeHTML(tk) + '</code>';
+    }).join(' ');
+
+    var tracks = data.tracks || [];
+    var albums = data.albums || [];
+    var artists = data.artists || [];
+    var hasAny = tracks.length > 0 || albums.length > 0 || artists.length > 0;
+
+    var summary = '<div class="search-summary">' +
+      '<div class="search-summary-left">' +
+        '<span>' + tracks.length + ' song' + (tracks.length === 1 ? '' : 's') + ', ' +
+        albums.length + ' album' + (albums.length === 1 ? '' : 's') + ', ' +
+        artists.length + ' artist' + (artists.length === 1 ? '' : 's') + '</span>' +
+        (tokenList ? ' · <span>Tokens: ' + tokenList + '</span>' : '') +
+      '</div>' +
+      '<div class="search-summary-right">' +
+        '<span>' + data.strict + ' strict</span> · <span>' + data.fallback + ' fallback</span>' +
+      '</div>' +
+    '</div>';
+
+    if (!hasAny) {
+      out.innerHTML = summary + '<div class="search-empty-box"><p class="hint">No matching songs, albums, or artists found in index.</p></div>';
+      return;
+    }
+
+    var html = summary + '<div class="search-content-body">';
+
+    if (activeTab === 'all') {
+      if (tracks.length > 0) {
+        html += '<div class="search-section">' +
+          '<div class="search-section-title">Songs <span class="search-section-count">(' + tracks.length + ')</span></div>' +
+          '<div class="search-track-list">' +
+          tracks.slice(0, 8).map(renderTrackItem).join('') +
+          '</div></div>';
+      }
+      if (albums.length > 0) {
+        html += '<div class="search-section">' +
+          '<div class="search-section-title">Albums <span class="search-section-count">(' + albums.length + ')</span></div>' +
+          '<div class="search-album-grid">' +
+          albums.slice(0, 6).map(renderAlbumCard).join('') +
+          '</div></div>';
+      }
+      if (artists.length > 0) {
+        html += '<div class="search-section">' +
+          '<div class="search-section-title">Artists <span class="search-section-count">(' + artists.length + ')</span></div>' +
+          '<div class="search-track-list search-artist-list">' +
+          artists.slice(0, 8).map(renderArtistItem).join('') +
+          '</div></div>';
+      }
+    } else if (activeTab === 'songs') {
+      if (tracks.length === 0) {
+        html += '<div class="search-empty-box"><p class="hint">No songs matching this query.</p></div>';
+      } else {
+        html += '<div class="search-track-list">' + tracks.map(renderTrackItem).join('') + '</div>';
+      }
+    } else if (activeTab === 'albums') {
+      if (albums.length === 0) {
+        html += '<div class="search-empty-box"><p class="hint">No albums matching this query.</p></div>';
+      } else {
+        html += '<div class="search-album-grid">' + albums.map(renderAlbumCard).join('') + '</div>';
+      }
+    } else if (activeTab === 'artists') {
+      if (artists.length === 0) {
+        html += '<div class="search-empty-box"><p class="hint">No artists matching this query.</p></div>';
+      } else {
+        html += '<div class="search-track-list search-artist-list">' + artists.map(renderArtistItem).join('') + '</div>';
+      }
+    }
+
+    html += '</div>';
+    out.innerHTML = html;
+  }
+
   function runSearch() {
     var query = input.value.trim();
     if (!query) {
       out.innerHTML = '<p class="hint" style="margin: 0.5rem 0;">Enter a search query.</p>';
+      lastData = null;
       return;
     }
     btn.disabled = true;
-    out.innerHTML = '<p class="hint" style="margin: 0.5rem 0;">Searching…</p>';
-    fetch('/setup/servers/' + encodeURIComponent(slug) + '/search?q=' + encodeURIComponent(query))
-      .then(function (res) { return res.json(); })
+    if (!lastData) {
+      out.innerHTML = '<p class="hint" style="margin: 0.5rem 0;">Searching…</p>';
+    }
+    fetch('/setup/servers/' + encodeURIComponent(slug) + '/test-search?q=' + encodeURIComponent(query))
+      .then(function (res) {
+        if (!res.ok) {
+          return res.text().then(function (txt) {
+            throw new Error(txt.trim() || ('HTTP ' + res.status));
+          });
+        }
+        return res.json();
+      })
       .then(function (data) {
         btn.disabled = false;
         if (!data.ok) {
           out.innerHTML = '<p class="error" style="margin: 0.5rem 0;">' + escapeHTML(data.error || 'Search failed') + '</p>';
+          lastData = null;
           return;
         }
-        var tokenList = (data.tokens || []).map(function (tk) {
-          return '<code>' + escapeHTML(tk) + '</code>';
-        }).join(' ');
-        var trackCount = data.tracks ? data.tracks.length : 0;
-        var totalMatches = (data.total !== undefined) ? data.total : (data.strict + data.fallback);
-        var countLabel = '';
-        if (totalMatches > trackCount) {
-          countLabel = 'Showing top ' + trackCount + ' of ' + totalMatches + ' matches';
-        } else {
-          countLabel = trackCount + ' result' + (trackCount === 1 ? '' : 's');
-        }
-        var summary = '<div class="search-summary">' +
-          '<div class="search-summary-left">' +
-            '<span>' + countLabel + '</span>' +
-            (tokenList ? ' · <span>Tokens: ' + tokenList + '</span>' : '') +
-          '</div>' +
-          '<div class="search-summary-right">' +
-            '<span>' + data.strict + ' strict</span> · <span>' + data.fallback + ' fallback</span>' +
-          '</div>' +
-        '</div>';
-        if (!data.tracks || data.tracks.length === 0) {
-          out.innerHTML = summary + '<div class="search-track-list empty"><p class="hint" style="margin: 0; padding: 14px; text-align: center;">No matching tracks found in index.</p></div>';
-          return;
-        }
-        var html = summary + '<div class="search-track-list">';
-        data.tracks.forEach(function (t) {
-          var qual = t.lossless ? 'LOSSLESS' : (t.codec || '');
-          var dur = formatDuration(t.duration);
-          var metaParts = [];
-          if (t.artist) metaParts.push(escapeHTML(t.artist));
-          if (t.album) metaParts.push('<em>' + escapeHTML(t.album) + '</em>');
-          var metaStr = metaParts.length > 0 ? ' — ' + metaParts.join(' · ') : '';
-
-          var badgeContent = '';
-          if (qual) badgeContent += '<span class="badge-quality">' + escapeHTML(qual) + '</span>';
-          if (dur) badgeContent += '<span class="badge-duration">' + escapeHTML(dur) + '</span>';
-
-          html += '<div class="search-track-item">' +
-            '<div class="search-track-info">' +
-              '<span class="search-track-title">' + escapeHTML(t.title) + '</span>' +
-              (metaStr ? '<span class="search-track-meta">' + metaStr + '</span>' : '') +
-            '</div>' +
-            (badgeContent ? '<span class="search-track-badge">' + badgeContent + '</span>' : '') +
-          '</div>';
-        });
-        html += '</div>';
-        out.innerHTML = html;
+        lastData = data;
+        renderResults();
       })
       .catch(function (err) {
         btn.disabled = false;
         out.innerHTML = '<p class="error" style="margin: 0.5rem 0;">Error: ' + escapeHTML(err.message) + '</p>';
+        lastData = null;
       });
   }
-  btn.addEventListener('click', runSearch);
+
+  input.addEventListener('input', function () {
+    updateClearVisibility();
+    var query = input.value.trim();
+    if (!query) {
+      clearSearch();
+      return;
+    }
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(runSearch, 220);
+  });
+
+  btn.addEventListener('click', function () {
+    clearTimeout(debounceTimer);
+    runSearch();
+  });
+
   input.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && input.value) {
       e.preventDefault();
       clearSearch();
     } else if (e.key === 'Enter') {
       e.preventDefault();
+      clearTimeout(debounceTimer);
       runSearch();
     }
   });
