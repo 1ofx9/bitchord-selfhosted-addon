@@ -6,6 +6,8 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-07
+
 ### Added
 
 - Support for BitChord 1.9.1 Addon Auth protocol v1 (`bitchordAuth: true` in `manifest.json`, offline JWKS token and ECDSA P-256 device proof verification via `X-BitChord-Token` and `X-BitChord-Proof`).
@@ -16,18 +18,8 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 - Strict title matching in Search Tester for songs (`library.TitleMatches`), ensuring song previews only surface tracks whose title matches query tokens.
 - Multi-artist parsing and index consolidation: composite artist tags separated by `;`, `•`, `|`, or ` / ` are parsed into individual artist entries, eliminating fragmented combo profiles and correctly attributing collaborative tracks.
 - Standardized multi-artist display formatting across song rows and album cards using ` • `.
-- Category support in search responses: returns distinct matching `albums` and `artists` alongside `tracks`.
-- Overhauled `/setup` Search Tester UI with category tabs (`[ All ] [ Songs ] [ Albums ] [ Artists ]`), live debounced search as you type, rich cover art thumbnails, album grid cards, and unified full-width artist list rows mirroring song items.
-
-### Fixed
-
-- Prevent `JSON.parse` syntax errors in the search tester by registering both `/setup/servers/{slug}/test-search` and `/setup/servers/{slug}/search` routes and enforcing HTTP response validation.
-- Fix prefix search truncation where exact word matches terminated prefix candidate expansion early (e.g. searching `lose` finding both `Lose My Mind` and `Loser`).
-
-## [1.4.0] - 2026-11-06
-
-### Added
-
+- Category support in search responses: returns distinct matching `albums` alongside `tracks`.
+- Overhauled `/setup` Search Tester UI with category tabs (`[ All ] [ Songs ] [ Albums ]`), live debounced search as you type, rich cover art thumbnails, and album grid cards.
 - Segmented button selector for server types on the server form.
 - Centered, streamlined form layouts for server and password configuration.
 - Dismissible toast notifications with clear status indicators.
@@ -40,6 +32,8 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ### Fixed
 
+- Prevent `JSON.parse` syntax errors in the search tester by registering both `/setup/servers/{slug}/test-search` and `/setup/servers/{slug}/search` routes and enforcing HTTP response validation.
+- Fix prefix search truncation where exact word matches terminated prefix candidate expansion early (e.g. searching `lose` finding both `Lose My Mind` and `Loser`).
 - Prevent duplicate sync interval options matching the default schedule.
 
 ## [1.3.12] - 2026-11-05
