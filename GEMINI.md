@@ -11,12 +11,12 @@
 - **If closed:** STOP and ask the user what to do before proceeding.
 
 ## 2. Main Repository Workflow (https://github.com/1ofx9/bitchord-selfhosted-addon)
-- **Push all files:** Commit and push regular working files and ongoing changes (under `## [Unreleased]`) to `origin main`.
+- **Push all files:** Commit and push regular working files, code, tests, styles, and templates to `origin main`.
 - **Release & Versioning:**
   - `CHANGELOG.md` on `main` tracks this repository's releases (`1.3.x`, `1.4.0`, etc.) and is distinct from the upstream PR changelog.
-  - **CRITICAL**: Committing a release version header in `CHANGELOG.md` on `main` triggers a GitHub Action that cuts a release and builds Docker images.
-  - **NEVER** commit a release changelog version without explicit user approval.
-  - Always ask the user if they want to cut a release and which version they want first, and **only proceed once the user approves**.
+  - **Always handle CHANGELOG.md separately** in its own commit (never bundled with regular code changes).
+  - Releases trigger via Git tags matching `v*`. When cutting a release, only tag the commit that contains the changelog update (`git tag -a v<version> -m "v<version>"`).
+  - **Leave the push process to the user**: Never push release changelog commits or version tags to GitHub (`origin main`). Leave pushing to the user so they control the release and workflow trigger.
 
 ## 3. General Principles
 - Maintain zero external Go dependencies in `go.mod`.
