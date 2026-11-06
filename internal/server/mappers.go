@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/rairulyle/bitchord-selfhosted-addon/internal/library"
 	"github.com/rairulyle/bitchord-selfhosted-addon/internal/media"
 )
 
@@ -73,7 +74,7 @@ func toTrackJSON(base string, track media.Track) trackJSON {
 	out := trackJSON{
 		ID:           track.ID,
 		Title:        track.Title,
-		Artist:       track.Artist,
+		Artist:       library.FormatArtists(track.Artist),
 		Album:        track.Album,
 		Duration:     track.DurationSec,
 		Format:       track.Codec,

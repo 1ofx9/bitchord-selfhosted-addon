@@ -221,7 +221,7 @@ func (s *server) search(w http.ResponseWriter, r *http.Request, src source) {
 		albums[i] = albumJSON{
 			ID:         alb.SampleID,
 			Title:      alb.Name,
-			Artist:     alb.Artist,
+			Artist:     library.FormatArtists(alb.Artist),
 			ArtworkURL: art,
 			TrackCount: alb.TrackCount,
 			Year:       alb.Year,

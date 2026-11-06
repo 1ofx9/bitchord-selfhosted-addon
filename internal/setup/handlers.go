@@ -482,16 +482,13 @@ func (a *app) testSearch(w http.ResponseWriter, r *http.Request) {
 		base = snapshot.PublicURL + "/" + slug + "/" + snapshot.Secret
 	}
 
-	matches := make([]matchTrack, 0, len(res.Tracks))
-	for _, t := range res.Tracks {
-		if !library.TitleMatches(t.Title, query) {
-			continue
-		}
+	matches := make([]matchTrack, len(res.Tracks))
+	for i, t := range res.Tracks {
 		art := ""
 		if t.ArtRef != "" && base != "" {
 			art = base + "/art/" + t.ID
 		}
-		matches = append(matches, matchTrack{
+		matches[i] = matchTrack{
 			ID:          t.ID,
 			Title:       t.Title,
 			Artist:      library.FormatArtists(t.Artist),
@@ -502,7 +499,7 @@ func (a *app) testSearch(w http.ResponseWriter, r *http.Request) {
 			SampleRate:  t.SampleRate,
 			Lossless:    media.Lossless(t.Codec),
 			ArtworkURL:  art,
-		})
+		}
 	}
 
 	albums := make([]matchAlbum, len(res.Albums))
