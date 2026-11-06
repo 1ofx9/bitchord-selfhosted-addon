@@ -1,7 +1,9 @@
 package library
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/rairulyle/bitchord-selfhosted-addon/internal/media"
@@ -48,6 +50,8 @@ func TestSearch(t *testing.T) {
 		"no match":                         {"zzz", 50, []string{}},
 		"blank query":                      {"   ", 50, []string{}},
 		"zero limit":                       {"closer", 0, []string{}},
+		"prefix match incomplete word":     {"emo gi", 50, []string{"1"}},
+		"noise word stripped":              {"adventure acoustic", 50, []string{"4"}},
 	}
 	ix := fixtureIndex()
 	for name, tc := range cases {
@@ -145,3 +149,302 @@ func TestFindReportsHowEachTierDid(t *testing.T) {
 		})
 	}
 }
+
+func TestSearchPrefixAndNoiseWords(t *testing.T) {
+	ix := NewIndex([]media.Track{
+		{ID: "1", Title: "On Kanna Vachi", Artist: "Saurav Srisan", Album: "On Kanna Vachi"},
+		{ID: "2", Title: "Lose Control", Artist: "Teddy Swims", Album: "I've Tried Everything But Therapy"},
+		{ID: "3", Title: "In the End", Artist: "Linkin Park", Album: "Hybrid Theory"},
+	})
+
+	// 1. Prefix match: "on kann" matches "On Kanna Vachi"
+	if got := ids(ix.Search("on kann", 10)); !reflect.DeepEqual(got, []string{"1"}) {
+		t.Errorf("prefix search 'on kann' = %v, want [1]", got)
+	}
+
+	// 2. Prefix match on single incomplete word
+	if got := ids(ix.Search("teddy swi", 10)); !reflect.DeepEqual(got, []string{"2"}) {
+		t.Errorf("prefix search 'teddy swi' = %v, want [2]", got)
+	}
+
+	// 3. Noise word stripping: "Lose Control (Live)" -> matches "Lose Control"
+	if got := ids(ix.Search("teddy swims lose control live", 10)); !reflect.DeepEqual(got, []string{"2"}) {
+		t.Errorf("noise stripping search = %v, want [2]", got)
+	}
+
+	// 4. Year + Remaster stripping: "In the End 2020 Remaster" -> matches "In the End"
+	if got := ids(ix.Search("in the end 2020 remaster", 10)); !reflect.DeepEqual(got, []string{"3"}) {
+		t.Errorf("year+remaster stripping search = %v, want [3]", got)
+	}
+}
+
+func TestPrefixRankingAndExpansionCap(t *testing.T) {
+	// 1. Title prefix match outranks artist/album prefix match, exact title match outranks prefix
+	ix := NewIndex([]media.Track{
+		{ID: "1", Title: "Something Else", Artist: "Kannada Singer", Album: "Great Hits"},
+		{ID: "2", Title: "Kanna Love", Artist: "Unknown", Album: "Various"},
+		{ID: "3", Title: "Kann", Artist: "Exact Matcher", Album: "Short Title"},
+	})
+
+	// When searching "kann", ID 3 (exact title hit) outranks ID 2 (prefix title hit) and ID 1 (artist hit)
+	res := ids(ix.Search("kann", 10))
+	if len(res) == 0 || res[0] != "3" {
+		t.Fatalf("search 'kann' top result = %v, want ID 3", res)
+	}
+
+	// When searching "kan", ID 3 and ID 2 (prefix in title) outrank ID 1 (prefix only in artist)
+	resPrefix := ids(ix.Search("kan", 10))
+	if !reflect.DeepEqual(resPrefix, []string{"3", "2", "1"}) {
+		t.Fatalf("search 'kan' results = %v, want [3 2 1]", resPrefix)
+	}
+
+	// 2. Expansion cap test: create 40 tracks each with a different prefix word (theme00, theme01, ..., theme39)
+	var manyTracks []media.Track
+	for i := 0; i < 40; i++ {
+		manyTracks = append(manyTracks, media.Track{
+			ID:    fmt.Sprintf("t%02d", i),
+			Title: fmt.Sprintf("Theme%02d", i),
+		})
+	}
+	ixMany := NewIndex(manyTracks)
+	gotMany := ixMany.Search("them", 50)
+	if len(gotMany) > 30 {
+		t.Errorf("prefix search expanded %d tracks, want <= 30 (capped)", len(gotMany))
+	}
+}
+
+func TestVideoSearchBehaviors(t *testing.T) {
+	ix := NewIndex([]media.Track{
+		{ID: "t1", Title: "SWEET / I THOUGHT YOU WANTED TO DANCE", Artist: "Tyler, The Creator", Album: "Call Me If You Get Lost"},
+		{ID: "t2", Title: "Sweet Life", Artist: "Frank Ocean", Album: "Channel Orange"},
+		{ID: "t3", Title: "Sweet", Artist: "Cigarettes After Sex", Album: "Cigarettes After Sex"},
+		{ID: "t4", Title: "Better Together", Artist: "Jack Johnson", Album: "In Between Dreams"},
+		{ID: "t5", Title: "Where This Flower Blooms", Artist: "Tyler, The Creator feat. Frank Ocean", Album: "Flower Boy"},
+		{ID: "t6", Title: "Amsham", Artist: "Aksomaniac", Album: "Amsham"},
+	})
+
+	// 1. Partial/substring "wee" matches Sweet, Sweet Life, SWEET..., and In Between Dreams
+	resWee := ix.Find("wee", 10)
+	weeIDs := ids(resWee.Tracks)
+	if len(weeIDs) < 4 {
+		t.Fatalf("expected at least 4 tracks for 'wee', got %v", weeIDs)
+	}
+	// "Sweet" and "Sweet Life" should be near top
+	if weeIDs[0] != "t3" && weeIDs[0] != "t2" && weeIDs[0] != "t1" {
+		t.Errorf("expected a Sweet song on top, got %s", weeIDs[0])
+	}
+	// Album match check: "In Between Dreams" should be in Albums
+	foundAlbum := false
+	for _, alb := range resWee.Albums {
+		if alb.Name == "In Between Dreams" {
+			foundAlbum = true
+			break
+		}
+	}
+	if !foundAlbum {
+		t.Errorf("expected 'In Between Dreams' in Albums for query 'wee'")
+	}
+
+	// 2. Multi-word prefix "frank oce" matches Frank Ocean tracks & artist
+	resFrank := ix.Find("frank oce", 10)
+	frankIDs := ids(resFrank.Tracks)
+	if len(frankIDs) < 2 {
+		t.Fatalf("expected Frank Ocean tracks, got %v", frankIDs)
+	}
+	foundArtist := false
+	for _, art := range resFrank.Artists {
+		if art.Name == "Frank Ocean" {
+			foundArtist = true
+			break
+		}
+	}
+	if !foundArtist {
+		t.Errorf("expected 'Frank Ocean' in Artists for query 'frank oce'")
+	}
+
+	// 3. Partial word "amsh" matches Amsham
+	resAmsh := ix.Find("amsh", 10)
+	amshIDs := ids(resAmsh.Tracks)
+	if len(amshIDs) == 0 || amshIDs[0] != "t6" {
+		t.Fatalf("expected 'Amsham' (t6) on top for 'amsh', got %v", amshIDs)
+	}
+}
+
+func TestLoseAndLoserPrefixAndEntityIsolation(t *testing.T) {
+	ix := NewIndex([]media.Track{
+		{ID: "t1", Title: "Loser", Artist: "Tame Impala", Album: "Deadbeat"},
+		{ID: "t2", Title: "Lose My Mind (feat. Doja Cat)", Artist: "Don Toliver", Album: "Lose My Mind"},
+	})
+
+	// 1. Searching "lose" should match BOTH "Lose My Mind" AND "Loser" (prefix of loser)
+	resLose := ix.Find("lose", 10)
+	loseIDs := ids(resLose.Tracks)
+	if len(loseIDs) != 2 {
+		t.Fatalf("expected both tracks for 'lose', got %v", loseIDs)
+	}
+
+	// For "lose", album "Lose My Mind" should match, but album "Deadbeat" must NOT match
+	for _, alb := range resLose.Albums {
+		if alb.Name == "Deadbeat" {
+			t.Errorf("album 'Deadbeat' should not match query 'lose'")
+		}
+	}
+	// For "lose", artist "Don Toliver" or "Tame Impala" must NOT match since neither has "lose"
+	for _, art := range resLose.Artists {
+		if art.Name == "Tame Impala" || art.Name == "Don Toliver" {
+			t.Errorf("artist '%s' should not match query 'lose'", art.Name)
+		}
+	}
+
+	// 2. Searching "loser" should match "Loser", but NOT "Deadbeat" under albums, and NOT "Tame Impala" under artists
+	resLoser := ix.Find("loser", 10)
+	if len(resLoser.Tracks) != 1 || resLoser.Tracks[0].ID != "t1" {
+		t.Fatalf("expected 'Loser' (t1) for 'loser', got %v", ids(resLoser.Tracks))
+	}
+	if len(resLoser.Albums) != 0 {
+		t.Errorf("expected 0 albums matching 'loser', got %v", resLoser.Albums)
+	}
+	if len(resLoser.Artists) != 0 {
+		t.Errorf("expected 0 artists matching 'loser', got %v", resLoser.Artists)
+	}
+
+	// 3. Searching "deadbeat" should match album "Deadbeat"
+	resDeadbeat := ix.Find("deadbeat", 10)
+	if len(resDeadbeat.Albums) != 1 || resDeadbeat.Albums[0].Name != "Deadbeat" {
+		t.Errorf("expected album 'Deadbeat' for query 'deadbeat', got %v", resDeadbeat.Albums)
+	}
+
+	// 4. Searching "tame" should match artist "Tame Impala"
+	resTame := ix.Find("tame", 10)
+	if len(resTame.Artists) != 1 || resTame.Artists[0].Name != "Tame Impala" {
+		t.Errorf("expected artist 'Tame Impala' for query 'tame', got %v", resTame.Artists)
+	}
+}
+
+func TestTitleMatches(t *testing.T) {
+	cases := []struct {
+		title string
+		query string
+		want  bool
+	}{
+		{"Loser", "loser", true},
+		{"Loser", "lose", true},
+		{"Lose My Mind (feat. Doja Cat)", "lose", true},
+		{"Lose My Mind (feat. Doja Cat)", "lose my", true},
+		{"Sweet / I Thought You Wanted to Dance", "wee", true},
+		{"Sweet / I Thought You Wanted to Dance", "sweet thought", true},
+		{"In the End (2020 Remaster)", "in the end", true},
+		{"In the End", "in the end 2020 remaster", true},
+		{"Pirai Thedum", "mayak", false},
+		{"Kadhal Yen Kadhal", "mayak", false},
+		{"Naan Sonnadhum Mazhai", "mayak", false},
+		{"Mayakkama Kalakkama", "mayak", true},
+		{"", "test", false},
+		{"Test", "", false},
+	}
+
+	for _, tc := range cases {
+		got := TitleMatches(tc.title, tc.query)
+		if got != tc.want {
+			t.Errorf("TitleMatches(%q, %q) = %v, want %v", tc.title, tc.query, got, tc.want)
+		}
+	}
+}
+
+func TestSplitArtists(t *testing.T) {
+	cases := []struct {
+		input string
+		want  []string
+	}{
+		{"Metro Boomin; The Weeknd; 21 Savage", []string{"Metro Boomin", "The Weeknd", "21 Savage"}},
+		{"The Weeknd • Gesaffelstein", []string{"The Weeknd", "Gesaffelstein"}},
+		{"The Weeknd • JENNIE • Lily-Rose Depp", []string{"The Weeknd", "JENNIE", "Lily-Rose Depp"}},
+		{"The Weeknd; Anitta", []string{"The Weeknd", "Anitta"}},
+		{"Artist A / Artist B", []string{"Artist A", "Artist B"}},
+		{"AC/DC", []string{"AC/DC"}},
+		{"Tyler, The Creator", []string{"Tyler, The Creator"}},
+		{"Earth, Wind & Fire", []string{"Earth, Wind & Fire"}},
+		{"", nil},
+	}
+
+	for _, tc := range cases {
+		got := SplitArtists(tc.input)
+		if !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("SplitArtists(%q) = %v, want %v", tc.input, got, tc.want)
+		}
+	}
+}
+
+func TestFormatArtists(t *testing.T) {
+	cases := []struct {
+		input string
+		want  string
+	}{
+		{"Metro Boomin; The Weeknd; 21 Savage", "Metro Boomin • The Weeknd • 21 Savage"},
+		{"The Weeknd • Gesaffelstein", "The Weeknd • Gesaffelstein"},
+		{"The Weeknd; Anitta", "The Weeknd • Anitta"},
+		{"The Weeknd", "The Weeknd"},
+		{"Tyler, The Creator", "Tyler, The Creator"},
+		{"", ""},
+	}
+
+	for _, tc := range cases {
+		got := FormatArtists(tc.input)
+		if got != tc.want {
+			t.Errorf("FormatArtists(%q) = %q, want %q", tc.input, got, tc.want)
+		}
+	}
+}
+
+func TestMultiArtistGroupingInIndex(t *testing.T) {
+	tracks := []media.Track{
+		{ID: "1", Title: "Starboy", Artist: "The Weeknd", Album: "Starboy"},
+		{ID: "2", Title: "Creepin'", Artist: "Metro Boomin; The Weeknd; 21 Savage", Album: "Heroes & Villains"},
+		{ID: "3", Title: "Lost in the Fire", Artist: "The Weeknd • Gesaffelstein", Album: "Hyperion"},
+		{ID: "4", Title: "Popular", Artist: "The Weeknd • Playboi Carti • Madonna", Album: "The Idol"},
+		{ID: "5", Title: "São Paulo", Artist: "The Weeknd; Anitta", Album: "Hurry Up Tomorrow"},
+	}
+
+	ix := NewIndex(tracks)
+
+	// Searching "weeknd" should find ONE unified "The Weeknd" artist with 5 tracks, not 5 separate combo artists!
+	res := ix.Find("weeknd", 10)
+	if len(res.Artists) == 0 {
+		t.Fatalf("expected to find artist for 'weeknd'")
+	}
+	var weeknd *ArtistMatch
+	for i := range res.Artists {
+		if res.Artists[i].Name == "The Weeknd" {
+			weeknd = &res.Artists[i]
+			break
+		}
+	}
+	if weeknd == nil {
+		t.Fatalf("expected 'The Weeknd' in artists, got: %+v", res.Artists)
+	}
+	if weeknd.TrackCount != 5 {
+		t.Errorf("expected The Weeknd to have 5 tracks, got %d", weeknd.TrackCount)
+	}
+
+	// Make sure combo strings like "The Weeknd • Gesaffelstein" are NOT in the artists list
+	for _, art := range res.Artists {
+		if strings.Contains(art.Name, "•") || strings.Contains(art.Name, ";") {
+			t.Errorf("found un-split combo artist in index: %s", art.Name)
+		}
+	}
+
+	// Searching "anitta" should find "Anitta"
+	resAnitta := ix.Find("anitta", 10)
+	if len(resAnitta.Artists) != 1 || resAnitta.Artists[0].Name != "Anitta" {
+		t.Errorf("expected 'Anitta' for query 'anitta', got %+v", resAnitta.Artists)
+	}
+
+	// Searching "gesaffelstein" should find "Gesaffelstein"
+	resGes := ix.Find("gesaffelstein", 10)
+	if len(resGes.Artists) != 1 || resGes.Artists[0].Name != "Gesaffelstein" {
+		t.Errorf("expected 'Gesaffelstein' for query 'gesaffelstein', got %+v", resGes.Artists)
+	}
+}
+
+
+

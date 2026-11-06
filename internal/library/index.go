@@ -10,25 +10,101 @@ import (
 )
 
 type Index struct {
-	tracks      []media.Track
-	byID        map[string]int
-	postings    map[string][]int
-	titlePosts  map[string][]int
-	titleTokens [][]string
-	titleForms  [][]string
+	tracks          []media.Track
+	byID            map[string]int
+	postings        map[string][]int
+	titlePosts      map[string][]int
+	sortedKeys      []string
+	sortedTitleKeys []string
+	titleTokens     [][]string
+	titleForms      [][]string
+	normTitles      []string
+	normArtists     []string
+	normAlbums      []string
+	normEverything  []string
+
+	albums  []albumRecord
+	artists []artistRecord
+}
+
+type albumRecord struct {
+	name       string
+	artist     string
+	trackCount int
+	year       int
+	artRef     string
+	sampleID   string
+	normName   string
+	normArtist string
+}
+
+type artistRecord struct {
+	name       string
+	trackCount int
+	artRef     string
+	sampleID   string
+	normName   string
+}
+
+type AlbumMatch struct {
+	Name       string `json:"name"`
+	Artist     string `json:"artist"`
+	ArtworkURL string `json:"artworkURL,omitempty"`
+	ArtRef     string `json:"-"`
+	SampleID   string `json:"id,omitempty"`
+	TrackCount int    `json:"trackCount"`
+	Year       int    `json:"year,omitempty"`
+}
+
+type ArtistMatch struct {
+	Name       string `json:"name"`
+	ArtworkURL string `json:"artworkURL,omitempty"`
+	ArtRef     string `json:"-"`
+	SampleID   string `json:"id,omitempty"`
+	TrackCount int    `json:"trackCount"`
+}
+
+type Result struct {
+	Tracks   []media.Track `json:"tracks"`
+	Albums   []AlbumMatch  `json:"albums"`
+	Artists  []ArtistMatch `json:"artists"`
+	Strict   int           `json:"strict"`
+	Fallback int           `json:"fallback"`
+	Tokens   []string      `json:"tokens"`
 }
 
 func NewIndex(tracks []media.Track) *Index {
 	ix := &Index{
-		tracks:      tracks,
-		byID:        make(map[string]int, len(tracks)),
-		postings:    map[string][]int{},
-		titlePosts:  map[string][]int{},
-		titleTokens: make([][]string, len(tracks)),
-		titleForms:  make([][]string, len(tracks)),
+		tracks:         tracks,
+		byID:           make(map[string]int, len(tracks)),
+		postings:       map[string][]int{},
+		titlePosts:     map[string][]int{},
+		titleTokens:    make([][]string, len(tracks)),
+		titleForms:     make([][]string, len(tracks)),
+		normTitles:     make([]string, len(tracks)),
+		normArtists:    make([]string, len(tracks)),
+		normAlbums:     make([]string, len(tracks)),
+		normEverything: make([]string, len(tracks)),
 	}
+
+	albumMap := make(map[string]*albumRecord)
+	artistMap := make(map[string]*artistRecord)
+
 	for i, t := range tracks {
 		ix.byID[t.ID] = i
+		cleanTitle := CleanString(t.Title)
+		cleanArtist := CleanString(t.Artist)
+		cleanAlbumArtist := CleanString(t.AlbumArtist)
+		cleanAlbum := CleanString(t.Album)
+
+		ix.normTitles[i] = cleanTitle
+		ix.normArtists[i] = cleanArtist
+		if cleanAlbumArtist != "" && cleanAlbumArtist != cleanArtist {
+			ix.normArtists[i] = cleanArtist + " " + cleanAlbumArtist
+		}
+		ix.normAlbums[i] = cleanAlbum
+		ix.normEverything[i] = strings.TrimSpace(cleanTitle + " " + ix.normArtists[i] + " " + cleanAlbum)
+
 		title := unique(Tokens(t.Title))
 		ix.titleTokens[i] = title
 		for _, token := range title {
@@ -54,7 +130,84 @@ func NewIndex(tracks []media.Track) *Index {
 		for token := range hits {
 			ix.postings[token] = append(ix.postings[token], i)
 		}
+
+		// Track album groupings
+		if t.Album != "" {
+			albumArtist := t.AlbumArtist
+			if albumArtist == "" {
+				albumArtist = t.Artist
+			}
+			key := strings.ToLower(t.Album) + "\x00" + strings.ToLower(albumArtist)
+			rec, ok := albumMap[key]
+			if !ok {
+				rec = &albumRecord{
+					name:       t.Album,
+					artist:     albumArtist,
+					artRef:     t.ArtRef,
+					sampleID:   t.ID,
+					normName:   cleanAlbum,
+					normArtist: CleanString(albumArtist),
+				}
+				albumMap[key] = rec
+			}
+			rec.trackCount++
+			if rec.artRef == "" && t.ArtRef != "" {
+				rec.artRef = t.ArtRef
+				rec.sampleID = t.ID
+			}
+		}
+
+		// Track artist groupings
+		seenTrackArtists := make(map[string]struct{})
+		for _, raw := range []string{t.Artist, t.AlbumArtist} {
+			for _, artName := range SplitArtists(raw) {
+				key := strings.ToLower(artName)
+				if _, dup := seenTrackArtists[key]; dup {
+					continue
+				}
+				seenTrackArtists[key] = struct{}{}
+				rec, ok := artistMap[key]
+				if !ok {
+					rec = &artistRecord{
+						name:       artName,
+						artRef:     t.ArtRef,
+						sampleID:   t.ID,
+						normName:   CleanString(artName),
+					}
+					artistMap[key] = rec
+				}
+				rec.trackCount++
+				if rec.artRef == "" && t.ArtRef != "" {
+					rec.artRef = t.ArtRef
+					rec.sampleID = t.ID
+				}
+			}
+		}
 	}
+
+	sortedKeys := make([]string, 0, len(ix.postings))
+	for k := range ix.postings {
+		sortedKeys = append(sortedKeys, k)
+	}
+	slices.Sort(sortedKeys)
+	ix.sortedKeys = sortedKeys
+
+	sortedTitleKeys := make([]string, 0, len(ix.titlePosts))
+	for k := range ix.titlePosts {
+		sortedTitleKeys = append(sortedTitleKeys, k)
+	}
+	slices.Sort(sortedTitleKeys)
+	ix.sortedTitleKeys = sortedTitleKeys
+
+	ix.albums = make([]albumRecord, 0, len(albumMap))
+	for _, rec := range albumMap {
+		ix.albums = append(ix.albums, *rec)
+	}
+	ix.artists = make([]artistRecord, 0, len(artistMap))
+	for _, rec := range artistMap {
+		ix.artists = append(ix.artists, *rec)
+	}
+
 	return ix
 }
 
@@ -81,33 +234,214 @@ func (ix *Index) Get(id string) (media.Track, bool) {
 	return ix.tracks[i], true
 }
 
-type Result struct {
-	Tracks   []media.Track
-	Strict   int
-	Fallback int
+var noiseWords = map[string]struct{}{
+	"live": {}, "remaster": {}, "remastered": {}, "feat": {}, "ft": {}, "featuring": {},
+	"deluxe": {}, "edition": {}, "bonus": {}, "track": {}, "acoustic": {}, "instrumental": {},
+	"official": {}, "video": {}, "audio": {}, "version": {}, "edit": {}, "mix": {}, "remix": {},
+	"pt": {}, "part": {}, "vol": {}, "volume": {},
+}
+
+func isYear(s string) bool {
+	if len(s) != 4 {
+		return false
+	}
+	for i := 0; i < 4; i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return s >= "1900" && s <= "2099"
+}
+
+func stripNoise(q []string) []string {
+	var cleaned []string
+	for _, t := range q {
+		if _, noise := noiseWords[t]; !noise && !isYear(t) {
+			cleaned = append(cleaned, t)
+		}
+	}
+	return cleaned
+}
+
+const maxPrefixExpansion = 30
+
+func prefixMatches(sortedKeys []string, token string, maxKeys int) []string {
+	if len(token) < 2 {
+		return nil
+	}
+	idx := sort.SearchStrings(sortedKeys, token)
+	var matched []string
+	for i := idx; i < len(sortedKeys); i++ {
+		key := sortedKeys[i]
+		if !strings.HasPrefix(key, token) {
+			break
+		}
+		matched = append(matched, key)
+		if len(matched) >= maxKeys {
+			break
+		}
+	}
+	return matched
+}
+
+func (ix *Index) lookupPostings(token string, prefix bool) []int {
+	exact := ix.postings[token]
+	if !prefix || len(token) < 2 {
+		return exact
+	}
+	keys := prefixMatches(ix.sortedKeys, token, maxPrefixExpansion)
+	if len(keys) == 0 {
+		return exact
+	}
+	if len(keys) == 1 && keys[0] == token {
+		return exact
+	}
+	var matched []int
+	seen := make(map[int]struct{})
+	for _, id := range exact {
+		seen[id] = struct{}{}
+		matched = append(matched, id)
+	}
+	for _, key := range keys {
+		if key == token {
+			continue
+		}
+		for _, id := range ix.postings[key] {
+			if _, ok := seen[id]; !ok {
+				seen[id] = struct{}{}
+				matched = append(matched, id)
+			}
+		}
+	}
+	sort.Ints(matched)
+	return matched
+}
+
+func (ix *Index) lookupTitle(token string, prefix bool) []int {
+	exact := ix.titlePosts[token]
+	if !prefix || len(token) < 2 {
+		return exact
+	}
+	keys := prefixMatches(ix.sortedTitleKeys, token, maxPrefixExpansion)
+	if len(keys) == 0 {
+		return exact
+	}
+	if len(keys) == 1 && keys[0] == token {
+		return exact
+	}
+	var matched []int
+	seen := make(map[int]struct{})
+	for _, id := range exact {
+		seen[id] = struct{}{}
+		matched = append(matched, id)
+	}
+	for _, key := range keys {
+		if key == token {
+			continue
+		}
+		for _, id := range ix.titlePosts[key] {
+			if _, ok := seen[id]; !ok {
+				seen[id] = struct{}{}
+				matched = append(matched, id)
+			}
+		}
+	}
+	sort.Ints(matched)
+	return matched
 }
 
 func (ix *Index) Search(query string, limit int) []media.Track { return ix.Find(query, limit).Tracks }
 
 func (ix *Index) Find(query string, limit int) Result {
+	cleanQ := CleanString(query)
 	q := unique(Tokens(query))
 	if len(q) == 0 || limit <= 0 {
-		return Result{}
+		return Result{Tokens: q}
 	}
-	strict := ix.strict(q)
+
+	strict := ix.strict(q, false)
 	seen := make(map[int]struct{}, len(strict))
 	for _, i := range strict {
 		seen[i] = struct{}{}
 	}
+
+	hasPrefixTokens := false
+	for _, tk := range q {
+		if len(tk) >= 2 {
+			hasPrefixTokens = true
+			break
+		}
+	}
+	if hasPrefixTokens {
+		for _, i := range ix.strict(q, true) {
+			if _, dup := seen[i]; !dup {
+				seen[i] = struct{}{}
+				strict = append(strict, i)
+			}
+		}
+	}
+
 	var loose []int
-	for _, i := range ix.fallback(q) {
+	for _, i := range ix.fallback(q, false) {
 		if _, dup := seen[i]; !dup {
+			seen[i] = struct{}{}
 			loose = append(loose, i)
 		}
 	}
-	ix.rank(strict, q)
-	ix.rank(loose, q)
-	result := Result{Strict: len(strict), Fallback: len(loose)}
+	if hasPrefixTokens {
+		for _, i := range ix.fallback(q, true) {
+			if _, dup := seen[i]; !dup {
+				seen[i] = struct{}{}
+				loose = append(loose, i)
+			}
+		}
+	}
+
+	// Tier 4: If no matches, strip variant/noise tokens (live, remaster, feat, etc.)
+	if len(strict) == 0 && len(loose) == 0 {
+		cleaned := stripNoise(q)
+		if len(cleaned) > 0 && len(cleaned) < len(q) {
+			for _, i := range ix.strict(cleaned, true) {
+				if _, dup := seen[i]; !dup {
+					seen[i] = struct{}{}
+					strict = append(strict, i)
+				}
+			}
+			for _, i := range ix.fallback(cleaned, true) {
+				if _, dup := seen[i]; !dup {
+					seen[i] = struct{}{}
+					loose = append(loose, i)
+				}
+			}
+		}
+	}
+
+	// Tier 5: Substring matching (BitChord client behavior: e.g. "wee" matches "Sweet", "In Between Dreams")
+	if len(strict) == 0 && len(loose) == 0 && len(cleanQ) >= 2 {
+		for i := range ix.tracks {
+			allMatch := true
+			for _, token := range q {
+				if !strings.Contains(ix.normEverything[i], token) {
+					allMatch = false
+					break
+				}
+			}
+			if allMatch {
+				if _, dup := seen[i]; !dup {
+					seen[i] = struct{}{}
+					loose = append(loose, i)
+				}
+			}
+		}
+	}
+
+	ix.rank(strict, cleanQ, q)
+	ix.rank(loose, cleanQ, q)
+	result := Result{
+		Strict:   len(strict),
+		Fallback: len(loose),
+		Tokens:   q,
+	}
 	ordered := append(strict, loose...)
 	if len(ordered) > limit {
 		ordered = ordered[:limit]
@@ -117,13 +451,18 @@ func (ix *Index) Find(query string, limit int) Result {
 		out[n] = ix.tracks[i]
 	}
 	result.Tracks = out
+
+	// Extract matching Albums and Artists
+	result.Albums = ix.findAlbums(cleanQ, q, ordered)
+	result.Artists = ix.findArtists(cleanQ, q, ordered)
+
 	return result
 }
 
-func (ix *Index) strict(q []string) []int {
+func (ix *Index) strict(q []string, prefix bool) []int {
 	lists := make([][]int, len(q))
 	for n, token := range q {
-		lists[n] = ix.postings[token]
+		lists[n] = ix.lookupPostings(token, prefix)
 		if len(lists[n]) == 0 {
 			return nil
 		}
@@ -139,42 +478,74 @@ func (ix *Index) strict(q []string) []int {
 	return result
 }
 
-func (ix *Index) fallback(q []string) []int {
+func (ix *Index) fallback(q []string, prefix bool) []int {
 	hits := map[int]int{}
 	for _, token := range q {
-		for _, i := range ix.titlePosts[token] {
+		for _, i := range ix.lookupTitle(token, prefix) {
 			hits[i]++
 		}
 	}
 	var out []int
 	for i, n := range hits {
-		if count := len(ix.titleTokens[i]); count >= 2 && n == count {
+		if count := len(ix.titleTokens[i]); count >= 2 && n >= count {
 			out = append(out, i)
 		}
 	}
 	return out
 }
 
-func (ix *Index) rank(candidates []int, q []string) {
+func (ix *Index) rank(candidates []int, cleanQ string, q []string) {
 	wanted := make(map[string]struct{}, len(q))
 	for _, token := range q {
 		wanted[token] = struct{}{}
 	}
-	titleHits := make(map[int]int, len(candidates))
+	titleScores := make(map[int]int, len(candidates))
 	for _, i := range candidates {
+		normTitle := ix.normTitles[i]
+		normArtist := ix.normArtists[i]
+		normAlbum := ix.normAlbums[i]
+
+		if normTitle == cleanQ {
+			titleScores[i] += 500
+		} else if strings.HasPrefix(normTitle, cleanQ) {
+			titleScores[i] += 250
+		} else if strings.Contains(normTitle, cleanQ) {
+			titleScores[i] += 120
+		}
+
+		if normArtist == cleanQ {
+			titleScores[i] += 200
+		} else if strings.HasPrefix(normArtist, cleanQ) {
+			titleScores[i] += 100
+		} else if strings.Contains(normArtist, cleanQ) {
+			titleScores[i] += 50
+		}
+
+		if strings.Contains(normAlbum, cleanQ) {
+			titleScores[i] += 30
+		}
+
 		for _, tokens := range [][]string{ix.titleTokens[i], ix.titleForms[i]} {
 			for _, token := range tokens {
 				if _, ok := wanted[token]; ok {
-					titleHits[i]++
+					titleScores[i] += 20
+					continue
+				}
+				for _, qToken := range q {
+					if len(qToken) >= 2 && strings.HasPrefix(token, qToken) {
+						titleScores[i] += 10
+						break
+					}
 				}
 			}
 		}
 	}
+
 	sort.Slice(candidates, func(a, b int) bool {
 		ia, ib := candidates[a], candidates[b]
 		ta, tb := ix.tracks[ia], ix.tracks[ib]
-		if titleHits[ia] != titleHits[ib] {
-			return titleHits[ia] > titleHits[ib]
+		if titleScores[ia] != titleScores[ib] {
+			return titleScores[ia] > titleScores[ib]
 		}
 		if la, lb := utf8.RuneCountInString(ta.Title), utf8.RuneCountInString(tb.Title); la != lb {
 			return la < lb
@@ -184,6 +555,166 @@ func (ix *Index) rank(candidates []int, q []string) {
 		}
 		return ta.ID < tb.ID
 	})
+}
+
+func (ix *Index) findAlbums(cleanQ string, q []string, matchedTracks []int) []AlbumMatch {
+	if len(ix.albums) == 0 || len(cleanQ) == 0 {
+		return nil
+	}
+	albumScore := make(map[int]int)
+	matchedAlbumNames := make(map[string]struct{})
+	for _, trackIdx := range matchedTracks {
+		alb := ix.tracks[trackIdx].Album
+		if alb != "" {
+			matchedAlbumNames[strings.ToLower(alb)] = struct{}{}
+		}
+	}
+
+	for i, alb := range ix.albums {
+		score := 0
+		if alb.normName == cleanQ {
+			score += 1000
+		} else if strings.HasPrefix(alb.normName, cleanQ) {
+			score += 600
+		} else if strings.Contains(alb.normName, cleanQ) {
+			score += 400
+		}
+		if alb.normArtist == cleanQ {
+			score += 500
+		} else if strings.HasPrefix(alb.normArtist, cleanQ) {
+			score += 300
+		} else if strings.Contains(alb.normArtist, cleanQ) {
+			score += 200
+		}
+
+		allTokensMatch := true
+		for _, tk := range q {
+			if !strings.Contains(alb.normName+" "+alb.normArtist, tk) {
+				allTokensMatch = false
+				break
+			}
+		}
+		if allTokensMatch && len(q) > 0 {
+			score += 250
+		}
+
+		// Only include albums whose own name or artist actually matched the query!
+		if score > 0 {
+			if _, ok := matchedAlbumNames[strings.ToLower(alb.name)]; ok {
+				score += 100
+			}
+			albumScore[i] = score
+		}
+	}
+
+	var candidates []int
+	for idx := range albumScore {
+		candidates = append(candidates, idx)
+	}
+	sort.Slice(candidates, func(a, b int) bool {
+		ia, ib := candidates[a], candidates[b]
+		sa, sb := albumScore[ia], albumScore[ib]
+		if sa != sb {
+			return sa > sb
+		}
+		return ix.albums[ia].name < ix.albums[ib].name
+	})
+
+	limit := 10
+	if len(candidates) < limit {
+		limit = len(candidates)
+	}
+	out := make([]AlbumMatch, limit)
+	for i := 0; i < limit; i++ {
+		alb := ix.albums[candidates[i]]
+		out[i] = AlbumMatch{
+			Name:       alb.name,
+			Artist:     alb.artist,
+			ArtRef:     alb.artRef,
+			SampleID:   alb.sampleID,
+			TrackCount: alb.trackCount,
+			Year:       alb.year,
+		}
+	}
+	return out
+}
+
+func (ix *Index) findArtists(cleanQ string, q []string, matchedTracks []int) []ArtistMatch {
+	if len(ix.artists) == 0 || len(cleanQ) == 0 {
+		return nil
+	}
+	artistScore := make(map[int]int)
+	matchedArtistNames := make(map[string]struct{})
+	for _, trackIdx := range matchedTracks {
+		for _, name := range SplitArtists(ix.tracks[trackIdx].Artist) {
+			matchedArtistNames[strings.ToLower(name)] = struct{}{}
+		}
+		for _, name := range SplitArtists(ix.tracks[trackIdx].AlbumArtist) {
+			matchedArtistNames[strings.ToLower(name)] = struct{}{}
+		}
+	}
+
+	for i, art := range ix.artists {
+		score := 0
+		if art.normName == cleanQ {
+			score += 1000
+		} else if strings.HasPrefix(art.normName, cleanQ) {
+			score += 600
+		} else if strings.Contains(art.normName, cleanQ) {
+			score += 400
+		}
+
+		allTokensMatch := true
+		for _, tk := range q {
+			if !strings.Contains(art.normName, tk) {
+				allTokensMatch = false
+				break
+			}
+		}
+		if allTokensMatch && len(q) > 0 {
+			score += 250
+		}
+
+		// Only include artists whose own name actually matched the query!
+		if score > 0 {
+			if _, ok := matchedArtistNames[strings.ToLower(art.name)]; ok {
+				score += 100
+			}
+			artistScore[i] = score
+		}
+	}
+
+	var candidates []int
+	for idx := range artistScore {
+		candidates = append(candidates, idx)
+	}
+	sort.Slice(candidates, func(a, b int) bool {
+		ia, ib := candidates[a], candidates[b]
+		sa, sb := artistScore[ia], artistScore[ib]
+		if sa != sb {
+			return sa > sb
+		}
+		if ix.artists[ia].trackCount != ix.artists[ib].trackCount {
+			return ix.artists[ia].trackCount > ix.artists[ib].trackCount
+		}
+		return ix.artists[ia].name < ix.artists[ib].name
+	})
+
+	limit := 10
+	if len(candidates) < limit {
+		limit = len(candidates)
+	}
+	out := make([]ArtistMatch, limit)
+	for i := 0; i < limit; i++ {
+		art := ix.artists[candidates[i]]
+		out[i] = ArtistMatch{
+			Name:       art.name,
+			ArtRef:     art.artRef,
+			SampleID:   art.sampleID,
+			TrackCount: art.trackCount,
+		}
+	}
+	return out
 }
 
 func intersect(a, b []int) []int {
@@ -215,3 +746,84 @@ func unique(tokens []string) []string {
 	}
 	return out
 }
+
+// TitleMatches reports whether the given track title strictly matches the query.
+// It returns true if the normalized title contains the query as a substring or
+// prefix, or if every non-noise token in the query matches at least one word in the
+// title (as an exact match, prefix, or substring).
+func TitleMatches(title, query string) bool {
+	cleanTitle := CleanString(title)
+	cleanQ := CleanString(query)
+	if cleanTitle == "" || cleanQ == "" {
+		return false
+	}
+	if strings.Contains(cleanTitle, cleanQ) {
+		return true
+	}
+	qTokens := unique(Tokens(query))
+	if len(qTokens) == 0 {
+		return false
+	}
+	cleaned := stripNoise(qTokens)
+	if len(cleaned) > 0 {
+		qTokens = cleaned
+	}
+	titleTokens := unique(Tokens(title))
+	if len(titleTokens) == 0 {
+		return false
+	}
+	for _, qTok := range qTokens {
+		matched := false
+		for _, tTok := range titleTokens {
+			if strings.Contains(tTok, qTok) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+	return true
+}
+
+// SplitArtists splits a composite artist string into individual artist names
+// by common multi-artist delimiters (; • | and " / ").
+// Delimiters without surrounding whitespace (like AC/DC) or band name
+// connectors (like & or , in "Tyler, The Creator") are preserved.
+func SplitArtists(s string) []string {
+	if s == "" {
+		return nil
+	}
+	clean := s
+	for _, delim := range []string{";", "•", " / ", "|"} {
+		clean = strings.ReplaceAll(clean, delim, "\x00")
+	}
+
+	parts := strings.Split(clean, "\x00")
+	var artists []string
+	seen := make(map[string]struct{}, len(parts))
+	for _, part := range parts {
+		name := strings.TrimSpace(part)
+		if name == "" {
+			continue
+		}
+		lower := strings.ToLower(name)
+		if _, dup := seen[lower]; !dup {
+			seen[lower] = struct{}{}
+			artists = append(artists, name)
+		}
+	}
+	return artists
+}
+
+// FormatArtists formats a multi-artist string consistently using " • ".
+func FormatArtists(s string) string {
+	parts := SplitArtists(s)
+	if len(parts) <= 1 {
+		return s
+	}
+	return strings.Join(parts, " • ")
+}
+
+

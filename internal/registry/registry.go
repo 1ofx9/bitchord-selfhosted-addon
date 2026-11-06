@@ -17,6 +17,7 @@ import (
 	"github.com/rairulyle/bitchord-selfhosted-addon/internal/media"
 	"github.com/rairulyle/bitchord-selfhosted-addon/internal/plex"
 	"github.com/rairulyle/bitchord-selfhosted-addon/internal/store"
+	"github.com/rairulyle/bitchord-selfhosted-addon/internal/subsonic"
 )
 
 type Options struct {
@@ -58,21 +59,34 @@ func DisplayName(kind, label string) string {
 	return kind + " - " + label
 }
 
+type Activity struct {
+	Time    time.Time
+	Slug    string
+	Server  string
+	Kind    string
+	Message string
+}
+
 type Status struct {
 	Ready     bool
 	Tracks    int
+	Artists   int
+	Albums    int
+	Duration  time.Duration
 	Refreshed time.Time
 	LastError string
 }
 
 type Registry struct {
-	opts      Options
-	clientID  string
-	mu        sync.RWMutex
-	entries   map[string]*Entry
-	pending   map[string]*handover
-	handovers sync.WaitGroup
-	changed   chan struct{}
+	opts       Options
+	clientID   string
+	mu         sync.RWMutex
+	entries    map[string]*Entry
+	pending    map[string]*handover
+	handovers  sync.WaitGroup
+	changed    chan struct{}
+	activityMu sync.RWMutex
+	activities []Activity
 }
 
 // handover is a restarted server's new entry, waiting for its first refresh
@@ -132,6 +146,9 @@ func NewBackend(server store.Server, clientID, version string, log *slog.Logger)
 			deviceID = clientID
 		}
 		return jellyfin.New(jellyfin.Options{BaseURL: server.URL, APIKey: server.Token, DeviceID: deviceID, Version: version}), nil
+	case store.Navidrome:
+		username, password := subsonic.SplitCredential(server.Token)
+		return subsonic.New(subsonic.Options{BaseURL: server.URL, Username: username, Password: password, ScrobblePercent: server.ScrobblePercent, Log: log}), nil
 	default:
 		return nil, fmt.Errorf("unknown server kind %q", server.Kind)
 	}
@@ -144,13 +161,86 @@ func (r *Registry) Lookup(slug string) (*Entry, bool) {
 	return entry, ok
 }
 
+func (r *Registry) RecordActivity(slug, server, kind, message string) {
+	r.activityMu.Lock()
+	defer r.activityMu.Unlock()
+	act := Activity{
+		Time:    time.Now(),
+		Slug:    slug,
+		Server:  server,
+		Kind:    kind,
+		Message: message,
+	}
+	r.activities = append([]Activity{act}, r.activities...)
+	if len(r.activities) > 30 {
+		r.activities = r.activities[:30]
+	}
+}
+
+func (r *Registry) RecentActivity() []Activity {
+	r.activityMu.RLock()
+	defer r.activityMu.RUnlock()
+	res := make([]Activity, len(r.activities))
+	copy(res, r.activities)
+	return res
+}
+
 func (r *Registry) Status(slug string) (Status, bool) {
 	entry, ok := r.Lookup(slug)
 	if !ok {
 		return Status{}, false
 	}
 	stats := entry.Library.Stats()
-	return Status{Ready: entry.Library.Ready(), Tracks: stats.Tracks, Refreshed: stats.Refreshed, LastError: stats.LastError}, true
+	return Status{
+		Ready:     entry.Library.Ready(),
+		Tracks:    stats.Tracks,
+		Artists:   stats.Artists,
+		Albums:    stats.Albums,
+		Duration:  stats.Duration,
+		Refreshed: stats.Refreshed,
+		LastError: stats.LastError,
+	}, true
+}
+
+// Refresh triggers an immediate library sync for the server named by slug.
+func (r *Registry) Refresh(ctx context.Context, slug string) error {
+	entry, ok := r.Lookup(slug)
+	if !ok {
+		return fmt.Errorf("server %q is not running", slug)
+	}
+	return entry.Library.Refresh(ctx)
+}
+
+type SearchResult struct {
+	Strict   int                   `json:"strict"`
+	Fallback int                   `json:"fallback"`
+	Tokens   []string              `json:"tokens"`
+	Tracks   []media.Track         `json:"tracks"`
+	Albums   []library.AlbumMatch  `json:"albums"`
+	Artists  []library.ArtistMatch `json:"artists"`
+}
+
+// Search queries a server's in-memory index directly for testing and diagnostics.
+func (r *Registry) Search(slug, query string, limit int) (SearchResult, bool) {
+	entry, ok := r.Lookup(slug)
+	if !ok {
+		return SearchResult{}, false
+	}
+	tokens := library.Tokens(query)
+	res := entry.Library.Find(query, limit)
+	return SearchResult{
+		Strict:   res.Strict,
+		Fallback: res.Fallback,
+		Tokens:   tokens,
+		Tracks:   res.Tracks,
+		Albums:   res.Albums,
+		Artists:  res.Artists,
+	}, true
+}
+
+// DefaultInterval reports the registry's configured default sync interval.
+func (r *Registry) DefaultInterval() time.Duration {
+	return r.opts.Interval
 }
 
 // Healthy is true once every running server has loaded an index, and true
@@ -260,7 +350,19 @@ func (e *Entry) setLabel(label string) {
 }
 
 func sameConnection(a, b store.Server) bool {
-	return a.Kind == b.Kind && a.URL == b.URL && a.Token == b.Token && a.DeviceID == b.DeviceID && a.Library == b.Library
+	return a.Kind == b.Kind && a.URL == b.URL && a.Token == b.Token && a.DeviceID == b.DeviceID && a.Library == b.Library && a.SyncInterval == b.SyncInterval
+}
+
+func (r *Registry) serverInterval(server store.Server) time.Duration {
+	if server.SyncInterval == "manual" || server.SyncInterval == "0" {
+		return 0
+	}
+	if server.SyncInterval != "" {
+		if d, err := time.ParseDuration(server.SyncInterval); err == nil && d > 0 {
+			return d
+		}
+	}
+	return r.opts.Interval
 }
 
 func (r *Registry) start(server store.Server) (*Entry, error) {
@@ -269,12 +371,22 @@ func (r *Registry) start(server store.Server) (*Entry, error) {
 	if err != nil {
 		return nil, err
 	}
+	slug := server.Slug
+	name := DisplayName(backend.Name(), server.Label)
+	if sub, ok := backend.(interface{ SetOnActivity(func(string, string)) }); ok {
+		sub.SetOnActivity(func(kind, message string) {
+			r.RecordActivity(slug, name, kind, message)
+		})
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	entry := &Entry{
 		Slug: server.Slug, Kind: server.Kind, Label: server.Label, Backend: backend,
-		Library: library.NewLibrary(backend, server.Library, r.opts.Interval, log),
+		Library: library.NewLibrary(backend, server.Library, r.serverInterval(server), log),
 		Log:     log, config: server, cancel: cancel, done: make(chan struct{}),
 	}
+	entry.Library.SetOnActivity(func(kind, message string) {
+		r.RecordActivity(slug, name, kind, message)
+	})
 	go func() {
 		defer close(entry.done)
 		entry.Library.Run(ctx)

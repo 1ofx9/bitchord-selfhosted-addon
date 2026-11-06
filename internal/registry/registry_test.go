@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -516,4 +517,78 @@ func TestDisplayNameIsSafeUnderConcurrentRelabel(t *testing.T) {
 	}
 	close(stop)
 	<-done
+}
+
+func TestRegistryRefresh(t *testing.T) {
+	fake := fakes.NewPlex(t)
+	r := newRegistry(t, snapshot(plexServer(fake, "plex-1")))
+	waitHealthy(t, r)
+
+	ctx := context.Background()
+	if err := r.Refresh(ctx, "plex-1"); err != nil {
+		t.Fatalf("refresh running server: %v", err)
+	}
+
+	if err := r.Refresh(ctx, "nonexistent"); err == nil {
+		t.Fatal("expected error refreshing nonexistent server, got nil")
+	}
+}
+
+func TestRegistrySearch(t *testing.T) {
+	fake := fakes.NewPlex(t)
+	r := newRegistry(t, snapshot(plexServer(fake, "plex-1")))
+	waitHealthy(t, r)
+
+	res, ok := r.Search("plex-1", "first song", 10)
+	if !ok {
+		t.Fatal("search returned not ok for running server")
+	}
+	if len(res.Tokens) == 0 {
+		t.Errorf("expected tokens, got none")
+	}
+
+	if _, ok := r.Search("nonexistent", "song", 10); ok {
+		t.Fatal("search returned ok for nonexistent server")
+	}
+}
+
+func TestRegistryServerInterval(t *testing.T) {
+	r := newRegistry(t, snapshot())
+	s := store.Server{}
+	if got := r.serverInterval(s); got != time.Hour {
+		t.Errorf("default interval = %v, want 1h", got)
+	}
+	s.SyncInterval = "30m"
+	if got := r.serverInterval(s); got != 30*time.Minute {
+		t.Errorf("custom interval = %v, want 30m", got)
+	}
+	s.SyncInterval = "manual"
+	if got := r.serverInterval(s); got != 0 {
+		t.Errorf("manual interval = %v, want 0", got)
+	}
+	s.SyncInterval = "0"
+	if got := r.serverInterval(s); got != 0 {
+		t.Errorf("zero interval = %v, want 0", got)
+	}
+}
+
+func TestRegistryActivity(t *testing.T) {
+	r := newRegistry(t, snapshot())
+	r.RecordActivity("server-1", "My Server", "sync", "Synced 100 tracks")
+	r.RecordActivity("server-1", "My Server", "now_playing", "Now playing: Song 1")
+	recent := r.RecentActivity()
+	if len(recent) != 2 {
+		t.Fatalf("expected 2 activities, got %d", len(recent))
+	}
+	if recent[0].Kind != "now_playing" || recent[1].Kind != "sync" {
+		t.Errorf("unexpected order of activities: %+v", recent)
+	}
+
+	// Verify ring buffer limit of 30
+	for i := 0; i < 35; i++ {
+		r.RecordActivity("server-1", "My Server", "test", fmt.Sprintf("event %d", i))
+	}
+	if len(r.RecentActivity()) != 30 {
+		t.Errorf("expected activity ring buffer capped at 30, got %d", len(r.RecentActivity()))
+	}
 }
