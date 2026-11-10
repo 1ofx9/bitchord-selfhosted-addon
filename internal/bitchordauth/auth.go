@@ -45,14 +45,14 @@ type Result struct {
 }
 
 type Options struct {
-	Hosts            []string
-	Issuer           string
-	JWKSURL          string
-	MaxProofAge      time.Duration
-	ClockSkew        time.Duration
-	HTTPClient       *http.Client
-	Now              func() time.Time
-	Mode             string // "enforce", "log", or "disabled"
+	Hosts       []string
+	Issuer      string
+	JWKSURL     string
+	MaxProofAge time.Duration
+	ClockSkew   time.Duration
+	HTTPClient  *http.Client
+	Now         func() time.Time
+	Mode        string // "enforce", "log", or "disabled"
 }
 
 type Auth struct {

@@ -468,7 +468,7 @@ func TestBitChordAddonAuthEnforce(t *testing.T) {
 	srv := newServer(Options{
 		Site:     func() Site { return Site{PublicURL: "https://addon.example.com", Secret: testSecret} },
 		Registry: stub, Version: "1.2.3", Log: log,
-		Auth:     bitchordauth.New(bitchordauth.Options{Mode: "enforce", Hosts: []string{"addon.example.com"}}),
+		Auth: bitchordauth.New(bitchordauth.Options{Mode: "enforce", Hosts: []string{"addon.example.com"}}),
 	})
 	handler := srv.handler()
 

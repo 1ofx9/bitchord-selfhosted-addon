@@ -169,10 +169,10 @@ func NewIndex(tracks []media.Track) *Index {
 				rec, ok := artistMap[key]
 				if !ok {
 					rec = &artistRecord{
-						name:       artName,
-						artRef:     t.ArtRef,
-						sampleID:   t.ID,
-						normName:   CleanString(artName),
+						name:     artName,
+						artRef:   t.ArtRef,
+						sampleID: t.ID,
+						normName: CleanString(artName),
 					}
 					artistMap[key] = rec
 				}
@@ -825,5 +825,3 @@ func FormatArtists(s string) string {
 	}
 	return strings.Join(parts, " • ")
 }
-
-

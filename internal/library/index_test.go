@@ -445,6 +445,3 @@ func TestMultiArtistGroupingInIndex(t *testing.T) {
 		t.Errorf("expected 'Gesaffelstein' for query 'gesaffelstein', got %+v", resGes.Artists)
 	}
 }
-
-
-
