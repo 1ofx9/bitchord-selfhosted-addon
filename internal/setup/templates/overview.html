@@ -159,7 +159,7 @@
   {{if and .Enabled .Running}}
   <details class="accordion search-box">
     <summary>
-      <span class="summary-title">Search tester</span>
+      <span class="summary-title">Search tester <kbd style="margin-left: 6px; font-size: 10px;">/</kbd></span>
       <svg class="chevron" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06z"/></svg>
     </summary>
     <div class="accordion-content">
@@ -168,6 +168,7 @@
         <div class="search-input-wrap">
           <svg class="search-lens" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
           <input type="text" class="search-q" placeholder="Type a song, artist, or album title…">
+          <kbd class="search-kbd">/</kbd>
           <button type="button" class="search-clear" aria-label="Clear search" style="display: none;">✕</button>
         </div>
         <button type="button" class="secondary search-run">Search</button>
@@ -192,11 +193,16 @@
       <svg class="chevron" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06z"/></svg>
     </summary>
     <div class="accordion-content">
-      <p class="hint" style="margin: 0 0 12px 0;">Latest sync and playback events across your servers.</p>
+      <p class="hint" style="margin: 0 0 8px 0;">Latest sync and playback events across your servers.</p>
+      <div class="activity-tabs" role="tablist" aria-label="Activity filter">
+        <button type="button" class="activity-tab active" data-filter="all" role="tab" aria-selected="true">All</button>
+        <button type="button" class="activity-tab" data-filter="sync" role="tab" aria-selected="false">Syncs</button>
+        <button type="button" class="activity-tab" data-filter="playback" role="tab" aria-selected="false">Playback</button>
+      </div>
       <div class="activity-list">
         {{if .Activities}}
           {{range .Activities}}
-          <div class="activity-row">
+          <div class="activity-row" data-kind="{{.Kind}}">
             <div class="activity-main">
               <span class="activity-icon-pill" title="{{.Kind}}">
                 {{if eq .Kind "sync"}}
@@ -216,6 +222,39 @@
         {{else}}
           <p class="hint empty-activity">No recent activity yet.</p>
         {{end}}
+      </div>
+    </div>
+  </details>
+</section>
+
+<section class="backup-section">
+  <details class="accordion backup-accordion">
+    <summary>
+      <span class="summary-title">Backup &amp; Restore</span>
+      <svg class="chevron" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06z"/></svg>
+    </summary>
+    <div class="accordion-content">
+      <p class="hint" style="margin: 0 0 14px 0;">Export your configured servers or restore from a previously saved JSON backup.</p>
+      <div class="backup-grid">
+        <div class="backup-col">
+          <label>Export Configuration</label>
+          <p class="hint">Download a JSON snapshot of your servers and public URL settings.</p>
+          <a class="button secondary backup-btn" href="/setup/backup">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+            Download backup
+          </a>
+        </div>
+        <div class="backup-col">
+          <label>Restore Configuration</label>
+          <p class="hint">Upload a JSON backup file. Current servers will be replaced with the backup configuration.</p>
+          <form method="post" action="/setup/restore" enctype="multipart/form-data" class="restore-form" onsubmit="return confirm('Restore this configuration? Existing servers will be replaced with the backup.')">
+            <input type="hidden" name="csrf" value="{{.CSRF}}">
+            <div class="restore-row">
+              <input type="file" name="backup_file" id="backup-file-input" class="restore-file-input" accept=".json,application/json" required>
+              <button type="submit" class="secondary">Restore</button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   </details>
@@ -297,7 +336,12 @@ document.querySelectorAll('.accordion.search-box').forEach(function (box) {
   var debounceTimer = null;
 
   function updateClearVisibility() {
-    clearBtn.style.display = input.value.trim() ? 'inline-flex' : 'none';
+    var val = input.value.trim();
+    clearBtn.style.display = val ? 'inline-flex' : 'none';
+    var wrap = input.closest('.search-input-wrap');
+    if (wrap) {
+      wrap.classList.toggle('has-text', !!val);
+    }
   }
 
   function clearSearch() {
@@ -502,9 +546,10 @@ document.querySelectorAll('.accordion.search-box').forEach(function (box) {
   });
 
   input.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && input.value) {
+    if (e.key === 'Escape') {
       e.preventDefault();
       clearSearch();
+      input.blur();
     } else if (e.key === 'Enter') {
       e.preventDefault();
       clearTimeout(debounceTimer);
@@ -513,10 +558,82 @@ document.querySelectorAll('.accordion.search-box').forEach(function (box) {
   });
 });
 
+document.addEventListener('keydown', function (e) {
+  if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    var active = document.activeElement;
+    var isInput = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT' || active.isContentEditable);
+    if (!isInput) {
+      e.preventDefault();
+      var searchBoxes = document.querySelectorAll('.accordion.search-box');
+      if (searchBoxes.length === 0) return;
+      var targetBox = null;
+      for (var i = 0; i < searchBoxes.length; i++) {
+        if (searchBoxes[i].open) {
+          targetBox = searchBoxes[i];
+          break;
+        }
+      }
+      if (!targetBox) targetBox = searchBoxes[0];
+      targetBox.open = true;
+      var qInput = targetBox.querySelector('.search-q');
+      if (qInput) {
+        qInput.focus();
+        qInput.select();
+      }
+    }
+  }
+});
+
 var activityDetails = document.querySelector('.activity-accordion');
 if (activityDetails) {
   var activityList = activityDetails.querySelector('.activity-list');
+  var activityTabs = activityDetails.querySelectorAll('.activity-tab');
+  var activeActivityFilter = 'all';
   var activityTimer = null;
+
+  function filterActivityRows() {
+    var rows = activityList.querySelectorAll('.activity-row');
+    var visibleCount = 0;
+    rows.forEach(function (row) {
+      var kind = row.dataset.kind || '';
+      var matches = true;
+      if (activeActivityFilter === 'sync') {
+        matches = (kind === 'sync');
+      } else if (activeActivityFilter === 'playback') {
+        matches = (kind === 'scrobble' || kind === 'now_playing');
+      }
+      row.style.display = matches ? 'flex' : 'none';
+      if (matches) visibleCount++;
+    });
+
+    var emptyHint = activityList.querySelector('.empty-filter-hint');
+    if (visibleCount === 0 && rows.length > 0) {
+      if (!emptyHint) {
+        emptyHint = document.createElement('p');
+        emptyHint.className = 'hint empty-filter-hint';
+        emptyHint.style.margin = '16px 0';
+        emptyHint.style.textAlign = 'center';
+        activityList.appendChild(emptyHint);
+      }
+      emptyHint.style.display = 'block';
+      emptyHint.textContent = 'No ' + (activeActivityFilter === 'sync' ? 'sync' : 'playback') + ' activity recorded yet.';
+    } else if (emptyHint) {
+      emptyHint.style.display = 'none';
+    }
+  }
+
+  activityTabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      activityTabs.forEach(function (t) {
+        t.classList.remove('active');
+        t.setAttribute('aria-selected', 'false');
+      });
+      tab.classList.add('active');
+      tab.setAttribute('aria-selected', 'true');
+      activeActivityFilter = tab.dataset.filter;
+      filterActivityRows();
+    });
+  });
 
   function getActivityIcon(kind) {
     if (kind === 'sync') {
@@ -539,7 +656,7 @@ if (activityDetails) {
         }
         var html = '';
         data.activities.forEach(function (act) {
-          html += '<div class="activity-row">' +
+          html += '<div class="activity-row" data-kind="' + escapeHTML(act.Kind || '') + '">' +
             '<div class="activity-main">' +
               '<span class="activity-icon-pill" title="' + escapeHTML(act.Kind || 'event') + '">' + getActivityIcon(act.Kind) + '</span>' +
               '<span class="activity-server-tag">' + escapeHTML(act.Server) + '</span>' +
@@ -549,6 +666,7 @@ if (activityDetails) {
           '</div>';
         });
         activityList.innerHTML = html;
+        filterActivityRows();
       })
       .catch(function () {});
   }
@@ -576,6 +694,8 @@ if (activityDetails) {
       activityTimer = setInterval(refreshActivity, 5000);
     }
   });
+
+  filterActivityRows();
 }
 
 function escapeHTML(str) {

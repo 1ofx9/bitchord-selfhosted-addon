@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -115,6 +116,25 @@ func (a *testApp) form(path string, values url.Values) *httptest.ResponseRecorde
 		values.Set("csrf", a.csrf())
 	}
 	return a.do(http.MethodPost, path, strings.NewReader(values.Encode()), "application/x-www-form-urlencoded")
+}
+
+func (a *testApp) multipartForm(path string, fieldName, filename string, content []byte) *httptest.ResponseRecorder {
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	if a.cookie != "" {
+		_ = mw.WriteField("csrf", a.csrf())
+	}
+	fw, err := mw.CreateFormFile(fieldName, filename)
+	if err != nil {
+		a.t.Fatal(err)
+	}
+	if _, err := fw.Write(content); err != nil {
+		a.t.Fatal(err)
+	}
+	if err := mw.Close(); err != nil {
+		a.t.Fatal(err)
+	}
+	return a.do(http.MethodPost, path, &buf, mw.FormDataContentType())
 }
 
 func (a *testApp) json(method, path string, body any) (*httptest.ResponseRecorder, map[string]any) {
@@ -1300,5 +1320,155 @@ func TestTheFirstPasswordKeepsAPublicURLAlreadySet(t *testing.T) {
 	a.form("https://music.example.com/setup/password", url.Values{"password": {password}})
 	if got := a.store.Snapshot().PublicURL; got != "https://other.example.com" {
 		t.Fatalf("public url = %q", got)
+	}
+}
+
+func TestStaticAssetsCachingAndCompression(t *testing.T) {
+	a := newTestApp(t)
+
+	// Normal GET request
+	rec := a.get("/setup/static/style.css")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /setup/static/style.css = %d, want 200", rec.Code)
+	}
+	etag := rec.Header().Get("ETag")
+	if etag == "" {
+		t.Error("expected ETag header on static asset")
+	}
+	if cc := rec.Header().Get("Cache-Control"); !strings.Contains(cc, "max-age") {
+		t.Errorf("Cache-Control = %q, want max-age", cc)
+	}
+	if ct := rec.Header().Get("Content-Type"); !strings.Contains(ct, "text/css") {
+		t.Errorf("Content-Type = %q, want text/css", ct)
+	}
+
+	// Conditional request with matching If-None-Match returns 304
+	a.headers.Set("If-None-Match", etag)
+	rec304 := a.get("/setup/static/style.css")
+	a.headers.Del("If-None-Match")
+	if rec304.Code != http.StatusNotModified {
+		t.Errorf("GET with matching If-None-Match = %d, want 304", rec304.Code)
+	}
+	if rec304.Body.Len() > 0 {
+		t.Errorf("304 response should have empty body, got %d bytes", rec304.Body.Len())
+	}
+
+	// Gzip compressed request
+	a.headers.Set("Accept-Encoding", "gzip")
+	recGz := a.get("/setup/static/style.css")
+	a.headers.Del("Accept-Encoding")
+	if recGz.Code != http.StatusOK {
+		t.Fatalf("GET with gzip = %d, want 200", recGz.Code)
+	}
+	if enc := recGz.Header().Get("Content-Encoding"); enc != "gzip" {
+		t.Errorf("Content-Encoding = %q, want gzip", enc)
+	}
+
+	// HEAD request
+	recHead := a.do(http.MethodHead, "/setup/static/style.css", nil, "")
+	if recHead.Code != http.StatusOK {
+		t.Errorf("HEAD /setup/static/style.css = %d, want 200", recHead.Code)
+	}
+	if recHead.Body.Len() > 0 {
+		t.Errorf("HEAD body should be empty, got %d bytes", recHead.Body.Len())
+	}
+	if recHead.Header().Get("Content-Length") == "" {
+		t.Error("HEAD expected Content-Length header")
+	}
+
+	// Non-existent static asset returns 404
+	rec404 := a.get("/setup/static/nonexistent.css")
+	if rec404.Code != http.StatusNotFound {
+		t.Errorf("GET non-existent asset = %d, want 404", rec404.Code)
+	}
+}
+
+func TestBackupExport(t *testing.T) {
+	a := newTestApp(t)
+	a.signIn()
+
+	if err := a.store.SetPublicURL("https://music.example.com"); err != nil {
+		t.Fatal(err)
+	}
+	fake := fakes.NewPlex(t)
+	a.addPlex(fake, "Home Plex")
+
+	rec := a.get("/setup/backup")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /setup/backup = %d, want 200", rec.Code)
+	}
+	cd := rec.Header().Get("Content-Disposition")
+	if !strings.Contains(cd, "attachment") || !strings.Contains(cd, "bitchord-addon-backup") {
+		t.Errorf("Content-Disposition = %q, want attachment with filename", cd)
+	}
+
+	var snap store.Snapshot
+	if err := json.Unmarshal(rec.Body.Bytes(), &snap); err != nil {
+		t.Fatalf("backup payload is not valid JSON Snapshot: %v", err)
+	}
+	if snap.PublicURL != "https://music.example.com" {
+		t.Errorf("backup PublicURL = %q, want https://music.example.com", snap.PublicURL)
+	}
+	if len(snap.Servers) != 1 || snap.Servers[0].Label != "Home Plex" {
+		t.Errorf("backup Servers = %+v, want 1 server", snap.Servers)
+	}
+	if snap.Admin != nil {
+		t.Error("backup must omit Admin credentials to prevent hash leakage")
+	}
+}
+
+func TestBackupRestore(t *testing.T) {
+	a := newTestApp(t)
+	a.signIn()
+
+	adminBefore := a.store.Snapshot().Admin
+	if adminBefore == nil {
+		t.Fatal("expected admin credentials after signIn")
+	}
+
+	backupData := store.Snapshot{
+		PublicURL: "https://restored-music.example.com",
+		Servers: []store.Server{
+			{
+				Slug:    "plex-1",
+				Kind:    store.Plex,
+				Label:   "Restored Plex",
+				URL:     "http://localhost:32400",
+				Token:   "tok",
+				Library: "1",
+				Auth:    store.AuthToken,
+				Enabled: true,
+			},
+		},
+	}
+	raw, _ := json.Marshal(backupData)
+
+	rec := a.multipartForm("/setup/restore", "backup_file", "backup.json", raw)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("POST /setup/restore = %d, want 303: %s", rec.Code, rec.Body.String())
+	}
+	loc := rec.Header().Get("Location")
+	if !strings.Contains(loc, "notice=") {
+		t.Errorf("redirect location = %q, want notice param", loc)
+	}
+
+	snap := a.store.Snapshot()
+	if snap.PublicURL != "https://restored-music.example.com" {
+		t.Errorf("PublicURL after restore = %q, want https://restored-music.example.com", snap.PublicURL)
+	}
+	if len(snap.Servers) != 1 || snap.Servers[0].Label != "Restored Plex" {
+		t.Errorf("Servers after restore = %+v, want 1 server", snap.Servers)
+	}
+	if snap.Admin == nil || snap.Admin.PasswordHash != adminBefore.PasswordHash {
+		t.Error("Admin credentials must be preserved after restore")
+	}
+
+	// Restore invalid JSON returns notice and leaves store intact
+	badRec := a.multipartForm("/setup/restore", "backup_file", "backup.json", []byte("invalid json"))
+	if badRec.Code != http.StatusSeeOther {
+		t.Fatalf("POST invalid json = %d, want 303", badRec.Code)
+	}
+	if snap := a.store.Snapshot(); snap.PublicURL != "https://restored-music.example.com" {
+		t.Errorf("PublicURL mutated after bad restore: %q", snap.PublicURL)
 	}
 }
