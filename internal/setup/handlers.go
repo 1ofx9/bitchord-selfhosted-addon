@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -510,6 +511,63 @@ func (a *app) refreshServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	redirectNotice(w, r, name+" synced.")
+}
+
+func (a *app) refreshAllServers(w http.ResponseWriter, r *http.Request) {
+	snapshot := a.Store.Snapshot()
+	var servers []store.Server
+	for _, s := range snapshot.Servers {
+		if s.Enabled {
+			servers = append(servers, s)
+		}
+	}
+	if len(servers) == 0 {
+		redirectNotice(w, r, "No enabled servers to sync.")
+		return
+	}
+
+	a.Log.Info("syncing all servers", "count", len(servers))
+	ctx, cancel := context.WithTimeout(r.Context(), a.Registry.DefaultInterval())
+	defer cancel()
+
+	type result struct {
+		name string
+		err  error
+	}
+	resCh := make(chan result, len(servers))
+	var wg sync.WaitGroup
+	for _, s := range servers {
+		wg.Add(1)
+		go func(srv store.Server) {
+			defer wg.Done()
+			name := registry.DisplayName(kindName(srv.Kind), srv.Label)
+			err := a.Registry.Refresh(ctx, srv.Slug)
+			resCh <- result{name: name, err: err}
+		}(s)
+	}
+	wg.Wait()
+	close(resCh)
+
+	var errs []string
+	synced := 0
+	for res := range resCh {
+		if res.err != nil {
+			a.Log.Error("sync failed during sync-all", "server", res.name, "error", res.err.Error())
+			errs = append(errs, fmt.Sprintf("%s: %s", res.name, res.err.Error()))
+		} else {
+			synced++
+		}
+	}
+
+	if len(errs) > 0 {
+		redirectNotice(w, r, fmt.Sprintf("Synced %d of %d servers (errors: %s)", synced, len(servers), strings.Join(errs, "; ")))
+		return
+	}
+	serverWord := "server"
+	if synced != 1 {
+		serverWord = "servers"
+	}
+	redirectNotice(w, r, fmt.Sprintf("All %d %s synced successfully.", synced, serverWord))
 }
 
 func (a *app) testSearch(w http.ResponseWriter, r *http.Request) {

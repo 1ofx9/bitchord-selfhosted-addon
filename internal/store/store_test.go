@@ -368,6 +368,10 @@ func TestStoreRestore(t *testing.T) {
 
 	restoreSnap := Snapshot{
 		PublicURL: "https://restored.example.com",
+		Admin: &Admin{
+			PasswordHash: "rogue_hash",
+			SessionKey:   "rogue_session",
+		},
 		Servers: []Server{
 			{
 				Slug:    "plex-1",
@@ -393,7 +397,7 @@ func TestStoreRestore(t *testing.T) {
 		t.Errorf("Servers = %+v, want 1 server", snap.Servers)
 	}
 	if snap.Admin == nil || snap.Admin.PasswordHash != "hashed" {
-		t.Errorf("Admin was not preserved: %+v", snap.Admin)
+		t.Errorf("Admin was not preserved or rogue admin was accepted: %+v", snap.Admin)
 	}
 	if snap.Secret != origSecret {
 		t.Errorf("Secret = %q, want %q", snap.Secret, origSecret)

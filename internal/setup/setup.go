@@ -178,6 +178,7 @@ func (a *app) handler() http.Handler {
 	mux.HandleFunc("POST /setup/servers/{slug}/delete", a.deleteServer)
 	mux.HandleFunc("POST /setup/servers/{slug}/enabled", a.setServerEnabled)
 	mux.HandleFunc("POST /setup/servers/{slug}/refresh", a.refreshServer)
+	mux.HandleFunc("POST /setup/sync-all", a.refreshAllServers)
 	mux.HandleFunc("GET /setup/servers/{slug}/test-search", a.testSearch)
 	mux.HandleFunc("GET /setup/servers/{slug}/search", a.testSearch)
 	mux.HandleFunc("GET /setup/activity", a.recentActivity)

@@ -2,7 +2,15 @@
 <div class="page-header">
   <h1>Servers</h1>
   {{if and .PublicURL .Servers}}
-  <a class="button" href="/setup/servers/new">+ Add server</a>
+  <div class="page-header-actions">
+    {{if gt (len .Servers) 1}}
+    <form method="post" action="/setup/sync-all" class="sync-form" style="margin: 0;">
+      <input type="hidden" name="csrf" value="{{$.CSRF}}">
+      <button type="submit" class="secondary sync-btn">Sync all</button>
+    </form>
+    {{end}}
+    <a class="button" href="/setup/servers/new">+ Add server</a>
+  </div>
   {{end}}
 </div>
 
@@ -66,7 +74,7 @@
             <span class="status-dot online"></span> Online
           </span>
         {{else}}
-          <span class="badge offline">
+          <span class="badge offline"{{if .Status.LastError}} title="{{.Status.LastError}}"{{end}}>
             <span class="status-dot offline"></span> Unreachable
           </span>
         {{end}}
@@ -95,6 +103,12 @@
       </form>
     </div>
   </div>
+  {{if and .Enabled (not .Online) .Status.LastError}}
+  <div class="server-error-banner" role="alert">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+    <span><strong>Connection error:</strong> {{.Status.LastError}}</span>
+  </div>
+  {{end}}
   <dl>
     <dt>Server</dt><dd><a href="{{.ServerURL}}" target="_blank" rel="noopener" class="server-link" title="Open {{.ServerURL}} in a new tab">{{.Host}}</a>{{if .Account}} · signed in as {{.Account}}{{end}}</dd>
     <dt>Library</dt><dd>{{.Library}}</dd>
@@ -239,6 +253,10 @@
         <div class="backup-col">
           <label>Export Configuration</label>
           <p class="hint">Download a JSON snapshot of your servers and public URL settings.</p>
+          <p class="hint security-hint">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Contains server access tokens. Keep this file private.
+          </p>
           <a class="button secondary backup-btn" href="/setup/backup">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
             Download backup

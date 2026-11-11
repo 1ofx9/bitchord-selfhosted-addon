@@ -247,12 +247,13 @@ func (s *Store) SetAdmin(admin *Admin) error {
 }
 
 // Restore validates and applies snap as the new configuration. If snap omits
-// admin credentials or secrets, the existing ones are preserved.
+// secrets, the existing ones are preserved. Admin credentials from the current
+// instance are always preserved so uploaded backups cannot overwrite them.
 func (s *Store) Restore(snap Snapshot) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	curr := s.current.Load()
-	if snap.Admin == nil && curr != nil && curr.Admin != nil {
+	if curr != nil && curr.Admin != nil {
 		admin := *curr.Admin
 		snap.Admin = &admin
 	}

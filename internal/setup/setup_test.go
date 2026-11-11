@@ -1428,6 +1428,10 @@ func TestBackupRestore(t *testing.T) {
 
 	backupData := store.Snapshot{
 		PublicURL: "https://restored-music.example.com",
+		Admin: &store.Admin{
+			PasswordHash: "forged_hash",
+			SessionKey:   "forged_session",
+		},
 		Servers: []store.Server{
 			{
 				Slug:    "plex-1",
@@ -1470,5 +1474,30 @@ func TestBackupRestore(t *testing.T) {
 	}
 	if snap := a.store.Snapshot(); snap.PublicURL != "https://restored-music.example.com" {
 		t.Errorf("PublicURL mutated after bad restore: %q", snap.PublicURL)
+	}
+}
+
+func TestRefreshAllServers(t *testing.T) {
+	a := newTestApp(t)
+	a.signIn()
+
+	// Sync all with no servers returns notice
+	recEmpty := a.form("/setup/sync-all", url.Values{})
+	if recEmpty.Code != http.StatusSeeOther || !strings.Contains(recEmpty.Header().Get("Location"), "No+enabled+servers") {
+		t.Fatalf("sync-all empty: %d, location: %s", recEmpty.Code, recEmpty.Header().Get("Location"))
+	}
+
+	fake1 := fakes.NewPlex(t)
+	a.addPlex(fake1, "Server 1")
+	fake2 := fakes.NewPlex(t)
+	a.addPlex(fake2, "Server 2")
+
+	rec := a.form("/setup/sync-all", url.Values{})
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("POST /setup/sync-all = %d, want 303", rec.Code)
+	}
+	loc := rec.Header().Get("Location")
+	if !strings.Contains(loc, "synced+successfully") {
+		t.Errorf("expected success notice in location %q", loc)
 	}
 }
