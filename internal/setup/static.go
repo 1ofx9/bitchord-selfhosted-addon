@@ -81,7 +81,7 @@ func newStaticServer(files fs.FS) http.Handler {
 		}
 
 		w.Header().Set("ETag", asset.etag)
-		w.Header().Set("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800")
+		w.Header().Set("Cache-Control", "no-cache, max-age=0, must-revalidate")
 		w.Header().Set("Vary", "Accept-Encoding")
 		w.Header().Set("Content-Type", asset.contentType)
 

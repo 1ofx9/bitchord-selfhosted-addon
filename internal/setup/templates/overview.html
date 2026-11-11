@@ -248,18 +248,17 @@
       <svg class="chevron" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06z"/></svg>
     </summary>
     <div class="accordion-content">
-      <p class="hint" style="margin: 0 0 14px 0;">Export your configured servers or restore from a previously saved JSON backup.</p>
+      <div class="alert-warning" role="alert">
+        <svg class="alert-warning-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
+        <div class="alert-warning-content">
+          <div class="alert-warning-title">Sensitive Credentials Notice</div>
+          <div class="alert-warning-text">Backup files contain unencrypted server access tokens and passwords. Store downloaded backups securely, do not commit them to version control, and never share them publicly.</div>
+        </div>
+      </div>
       <div class="backup-grid">
         <div class="backup-col">
           <label>Export Configuration</label>
           <p class="hint">Download a JSON snapshot of your servers and public URL settings.</p>
-          <div class="alert-warning" role="alert">
-            <svg class="alert-warning-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
-            <div class="alert-warning-content">
-              <span class="alert-warning-title">Sensitive Credentials</span>
-              <span class="alert-warning-text">Backups contain unencrypted server access tokens and passwords. Store this file securely and never share it publicly.</span>
-            </div>
-          </div>
           <a class="button secondary backup-btn" href="/setup/backup">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
             Download backup
