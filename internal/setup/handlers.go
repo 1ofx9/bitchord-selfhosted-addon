@@ -230,13 +230,13 @@ type submitted struct {
 }
 
 func readSubmitted(r *http.Request) submitted {
-	scrobblePercent := 50
-	if raw := r.PostFormValue("scrobble_percent"); raw != "" {
-		if p, err := strconv.Atoi(raw); err == nil && p >= 10 && p <= 90 {
-			scrobblePercent = p
-		}
-		if r.PostFormValue("scrobble_enabled") == "" {
-			scrobblePercent = -1 // checkbox was explicitly unchecked
+	scrobblePercent := -1
+	if r.PostFormValue("scrobble_enabled") != "" {
+		scrobblePercent = 50
+		if raw := r.PostFormValue("scrobble_percent"); raw != "" {
+			if p, err := strconv.Atoi(raw); err == nil && p >= 10 && p <= 90 {
+				scrobblePercent = p
+			}
 		}
 	}
 	return submitted{

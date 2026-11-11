@@ -211,7 +211,7 @@ type serverFormView struct {
 
 func (a *app) formView(r *http.Request, title string) serverFormView {
 	defInterval := formatDuration(a.Registry.DefaultInterval())
-	return serverFormView{page: a.page(r, title), Kind: store.Plex, KindName: "Plex", Enabled: true, ScrobblePercent: 50, DefaultInterval: defInterval, Kinds: kindOptions, Action: "/setup/servers", Auth: store.AuthToken}
+	return serverFormView{page: a.page(r, title), Kind: store.Plex, KindName: "Plex", Enabled: true, ScrobblePercent: -1, DefaultInterval: defInterval, Kinds: kindOptions, Action: "/setup/servers", Auth: store.AuthToken}
 }
 
 func hostOf(raw string) string {

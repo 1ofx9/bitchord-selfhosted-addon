@@ -668,7 +668,7 @@ func TestNavidromeSignInStoresTheTokenAndNeverThePassword(t *testing.T) {
 		t.Fatal("the password reached the browser")
 	}
 	ref := answer["ref"].(string)
-	if rec := a.form("/setup/servers", url.Values{"kind": {"navidrome"}, "label": {"NAS"}, "url": {fake.URL}, "token_ref": {ref}, "library": {"Music"}, "enabled": {"1"}}); rec.Code != http.StatusSeeOther {
+	if rec := a.form("/setup/servers", url.Values{"kind": {"navidrome"}, "label": {"NAS"}, "url": {fake.URL}, "token_ref": {ref}, "library": {"Music"}, "enabled": {"1"}, "scrobble_enabled": {"1"}}); rec.Code != http.StatusSeeOther {
 		t.Fatalf("save: %d %s", rec.Code, rec.Body.String())
 	}
 	server, _ := a.store.Snapshot().Server("navidrome-1")

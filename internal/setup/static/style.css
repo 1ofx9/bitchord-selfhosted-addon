@@ -309,8 +309,8 @@ main > p { margin: 20px 0; }
 
 /* Form Container & Layout */
 .form-container {
-  max-width: 580px;
-  margin: 32px auto;
+  max-width: 960px;
+  margin: 28px auto;
   box-sizing: border-box;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -339,7 +339,19 @@ main > p { margin: 20px 0; }
 .form-body {
   display: flex;
   flex-direction: column;
+  gap: 20px;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px 32px;
+  align-items: start;
+}
+.form-col {
+  display: flex;
+  flex-direction: column;
   gap: 18px;
+  min-width: 0;
 }
 
 /* Segmented Button Pills (Server Type Selector) */
@@ -477,7 +489,9 @@ input[type=range]::-moz-range-thumb {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-top: 10px;
+  margin-top: 6px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line-soft);
 }
 .visually-hidden {
   position: absolute;
@@ -679,16 +693,16 @@ code { font-family: ui-monospace, "SF Mono", monospace; font-size: 12.5px; word-
 .copy-pill .copy-feedback {
   font-size: 11px;
   font-weight: 500;
-  color: var(--online);
+  color: var(--strong);
   display: none;
 }
 .copy-pill .check-icon {
   display: none;
-  color: var(--online);
+  color: var(--strong);
 }
 .copy-pill.copied {
-  border-color: var(--online);
-  background: var(--online-bg);
+  border-color: var(--border);
+  background: var(--surface-raised);
 }
 .copy-pill.copied .copy-feedback {
   display: inline;
@@ -853,12 +867,13 @@ code.url { display: inline-block; max-width: 100%; }
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin: 18px 0 0;
-  padding: 10px 14px;
+  margin: 18px 0;
+  padding: 12px 16px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 13.5px;
+  line-height: 1.5;
   color: var(--strong);
   box-shadow: var(--shadow-sm);
   transition: opacity 0.25s ease, transform 0.25s ease;
@@ -871,18 +886,18 @@ code.url { display: inline-block; max-width: 100%; }
 .notice-main {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
   min-width: 0;
 }
 .notice-icon {
-  color: var(--online);
+  color: var(--strong);
   flex-shrink: 0;
 }
 .notice.error .notice-icon, p.error .notice-icon {
   color: var(--danger);
 }
 .notice-close {
-  background: none;
+  background: transparent;
   border: 0;
   padding: 0;
   color: var(--muted);
@@ -892,11 +907,19 @@ code.url { display: inline-block; max-width: 100%; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  width: 20px;
-  height: 20px;
+  border-radius: 4px;
+  width: 22px;
+  height: 22px;
   transition: all 0.15s ease;
   flex-shrink: 0;
+}
+.notice-close:hover {
+  color: var(--strong);
+  background: var(--surface-raised);
+}
+.notice-close:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ring);
 }
 .notice-close:hover {
   color: var(--strong);
@@ -1071,22 +1094,18 @@ details.accordion .accordion-content {
 
 /* Search Tester Tabs */
 .search-tabs {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 3px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 3px;
+  gap: 8px;
   margin: 12px 0 14px;
 }
 .search-tab {
   background: transparent;
   color: var(--muted);
   border: 1px solid transparent;
-  padding: 5px 14px;
+  padding: 4px 12px;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -1098,13 +1117,13 @@ details.accordion .accordion-content {
 }
 .search-tab:hover {
   color: var(--strong);
+  background: var(--surface-raised);
 }
 .search-tab.active {
-  background: var(--surface);
+  background: var(--surface-raised);
   color: var(--strong);
   border-color: var(--border);
   font-weight: 600;
-  box-shadow: var(--shadow-sm);
 }
 .search-tab:focus-visible {
   outline: none;
@@ -1341,6 +1360,13 @@ details.accordion .accordion-content {
 
 
 /* Responsive Mobile Layout Adjustments */
+@media (max-width: 768px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
 @media (max-width: 640px) {
   header, main {
     padding-left: 16px;
@@ -1376,10 +1402,12 @@ details.accordion .accordion-content {
     margin: 0 0 20px;
   }
   .form-container {
-    margin: 20px auto;
+    margin: 16px auto;
+    padding: 20px 16px;
   }
   .form-container.form-compact {
-    margin: 20px auto;
+    margin: 16px auto;
+    padding: 20px 16px;
   }
   .segmented-control {
     grid-template-columns: 1fr;
