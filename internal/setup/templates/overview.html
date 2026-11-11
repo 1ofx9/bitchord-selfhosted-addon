@@ -248,21 +248,14 @@
       <svg class="chevron" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06z"/></svg>
     </summary>
     <div class="accordion-content">
-      <div class="alert-info" role="note">
-        <svg class="alert-info-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        <div class="alert-info-content">
-          <div class="alert-info-title">Encrypted Configuration Backups</div>
-          <div class="alert-info-text">Protect your tokens and passwords with AES-256-GCM encryption. Enter an optional password when downloading to encrypt the file, or leave blank to export as plaintext.</div>
-        </div>
-      </div>
       <div class="backup-grid">
         <div class="backup-col">
           <label>Export Configuration</label>
-          <p class="hint">Download a snapshot of your servers and public URL settings.</p>
+          <p class="hint">Download an encrypted backup of your servers and settings.</p>
           <form method="post" action="/setup/backup" class="backup-form">
             <input type="hidden" name="csrf" value="{{.CSRF}}">
             <div class="backup-field-row">
-              <input type="password" name="passphrase" class="backup-passphrase-input" placeholder="Encryption password (optional)" autocomplete="new-password">
+              <input type="password" name="passphrase" class="backup-passphrase-input" placeholder="Password" required autocomplete="new-password">
               <button type="submit" class="secondary backup-btn">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
                 Download backup
@@ -272,12 +265,12 @@
         </div>
         <div class="backup-col">
           <label>Restore Configuration</label>
-          <p class="hint">Upload a JSON backup file. Current servers will be replaced with the backup configuration.</p>
+          <p class="hint">Upload a backup file. Existing servers will be replaced with the backup configuration.</p>
           <form method="post" action="/setup/restore" enctype="multipart/form-data" class="restore-form" onsubmit="return confirm('Restore this configuration? Existing servers will be replaced with the backup.')">
             <input type="hidden" name="csrf" value="{{.CSRF}}">
             <div class="backup-field-row">
               <input type="file" name="backup_file" id="backup-file-input" class="restore-file-input" accept=".json,application/json" required>
-              <input type="password" name="passphrase" class="backup-passphrase-input" placeholder="Password (if encrypted)" autocomplete="current-password">
+              <input type="password" name="passphrase" class="backup-passphrase-input" placeholder="Password" autocomplete="current-password">
               <button type="submit" class="secondary">Restore</button>
             </div>
           </form>

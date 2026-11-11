@@ -202,6 +202,10 @@ func (a *app) exportBackup(w http.ResponseWriter, r *http.Request) {
 	if passphrase == "" && r.Method == http.MethodGet {
 		passphrase = r.URL.Query().Get("passphrase")
 	}
+	if passphrase == "" {
+		http.Error(w, "password is required to encrypt backup", http.StatusBadRequest)
+		return
+	}
 
 	snap := a.Store.Snapshot()
 	snap.Admin = nil
@@ -211,11 +215,7 @@ func (a *app) exportBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	filename := fmt.Sprintf("bitchord-addon-backup-%s.json", a.Now().Format("2006-01-02-150405"))
-	if passphrase != "" {
-		filename = fmt.Sprintf("bitchord-addon-backup-encrypted-%s.json", a.Now().Format("2006-01-02-150405"))
-	}
-
+	filename := fmt.Sprintf("bitchord-addon-backup-encrypted-%s.json", a.Now().Format("2006-01-02-150405"))
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
 	w.Header().Set("Cache-Control", "no-store")

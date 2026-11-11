@@ -1371,43 +1371,6 @@ details.accordion .accordion-content {
 .restore-file-input::file-selector-button:hover {
   background: var(--line);
 }
-.alert-info {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px 14px;
-  margin: 0 0 16px 0;
-  border-radius: 8px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--strong);
-  color: var(--text);
-  line-height: 1.45;
-}
-.alert-info-icon {
-  flex-shrink: 0;
-  margin-top: 2px;
-  color: var(--strong);
-}
-.alert-info-content {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-  flex: 1;
-}
-.alert-info-title {
-  color: var(--strong);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-.alert-info-text {
-  color: var(--muted);
-  font-size: 12.5px;
-  line-height: 1.45;
-  margin: 0;
-}
 .alert-warning {
   display: flex;
   align-items: flex-start;

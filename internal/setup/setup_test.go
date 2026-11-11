@@ -1400,18 +1400,24 @@ func TestBackupExport(t *testing.T) {
 	fake := fakes.NewPlex(t)
 	a.addPlex(fake, "Home Plex")
 
-	rec := a.get("/setup/backup")
+	// Calling backup without password returns Bad Request
+	recBad := a.get("/setup/backup")
+	if recBad.Code != http.StatusBadRequest {
+		t.Fatalf("GET /setup/backup without password = %d, want 400", recBad.Code)
+	}
+
+	rec := a.get("/setup/backup?passphrase=backup-test-pass")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("GET /setup/backup = %d, want 200", rec.Code)
 	}
 	cd := rec.Header().Get("Content-Disposition")
-	if !strings.Contains(cd, "attachment") || !strings.Contains(cd, "bitchord-addon-backup") {
+	if !strings.Contains(cd, "attachment") || !strings.Contains(cd, "bitchord-addon-backup-encrypted") {
 		t.Errorf("Content-Disposition = %q, want attachment with filename", cd)
 	}
 
-	var snap store.Snapshot
-	if err := json.Unmarshal(rec.Body.Bytes(), &snap); err != nil {
-		t.Fatalf("backup payload is not valid JSON Snapshot: %v", err)
+	snap, err := store.DecryptSnapshot(rec.Body.Bytes(), "backup-test-pass")
+	if err != nil {
+		t.Fatalf("failed to decrypt backup payload: %v", err)
 	}
 	if snap.PublicURL != "https://music.example.com" {
 		t.Errorf("backup PublicURL = %q, want https://music.example.com", snap.PublicURL)
