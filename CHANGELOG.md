@@ -6,6 +6,16 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ## [Unreleased]
 
+## [1.4.2] - 2026-11-11
+
+### Added
+
+- Embedded static asset caching and compression with SHA-256 ETags, precomputed gzip compression (`gzip.BestCompression`), HTTP 304 conditional validation (`If-None-Match`), and explicit `Cache-Control` / `Vary` headers.
+- Filterable recent activity accordion with category tabs (`All`, `Syncs`, `Playback`) that retain the selected filter across live 5-second background polling intervals.
+- One-click configuration backup and restore (`GET /setup/backup` and `POST /setup/restore`) with atomic store updates, validation checks, and automatic preservation of admin credentials.
+- Search tester keyboard shortcuts: press `/` anywhere on the page to open the tester and focus search input, and `Escape` to clear and dismiss.
+- Manual theme switcher with header toggle (`System`, `Dark`, `Light`), `localStorage` persistence, and synchronous pre-render theme application to eliminate flash of unstyled content.
+
 ## [1.4.1] - 2026-11-11
 
 ### Added
