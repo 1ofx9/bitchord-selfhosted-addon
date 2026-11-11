@@ -34,8 +34,11 @@ in your library, your own copy plays.
 - **Fast search.** The addon keeps a list of your tracks in memory, about
   30–50 MB for 100,000 tracks.
 - **Original quality.** Your files are streamed as they are, with seeking.
-- **Search tester.** Test query tokenization and match results directly in the browser to diagnose how tracks are resolved.
-- **Sync webhooks.** Trigger instant library scans via webhooks from Plex, Jellyfin, Navidrome, or automation scripts.
+- **Search tester.** Test query tokenization and match results directly in the browser to diagnose how tracks are resolved (press `/` anywhere to open).
+- **Sync webhooks & Sync all.** Trigger instant library scans via webhooks, or sync all configured servers in parallel with the "Sync all" header button.
+- **Encrypted backups.** Export and restore password-protected configuration snapshots secured with AES-256-GCM authenticated encryption.
+- **Offline diagnostics.** Direct error diagnostics on server cards display the exact connection failure reason when a service is unreachable.
+- **Theme switcher.** Switch between System, Dark, and Light themes directly in the setup header.
 - **Private.** Your Plex, Jellyfin and Subsonic tokens never leave the addon,
   and every link contains a secret.
 
@@ -139,6 +142,13 @@ These optional environment variables are the only other settings:
 | `LOG_LEVEL`          | `info`  | `debug`, `info`, `warn` or `error`                                   |
 | `LOG_FORMAT`         | `text`  | `text`, or `json` for log collectors                                 |
 
+### Backup & Restore
+
+Export and restore configuration snapshots directly from the `/setup` overview page:
+
+- **Encrypted backups:** Enter a password when downloading to encrypt server definitions, credentials, and settings with AES-256-GCM authenticated encryption (PBKDF2-HMAC-SHA256 key derivation).
+- **Safe restore:** Restoring a backup replaces server configurations while unconditionally preserving the current instance's admin credentials, preventing accidental lockouts or admin takeovers. Legacy unencrypted backups are also supported.
+
 ## 📱 Using it in BitChord
 
 Each server's link looks like this:
@@ -220,7 +230,7 @@ server. Passwords, tokens and the secret are never logged.
 | Log says `cannot open the data file`         | The addon can't write `/data`, or `addon.json` is broken. Fix the folder owner or the file         |
 | Log says Plex, Jellyfin or Navidrome rejected the token | The token or credential was revoked. Edit the server on the setup page and sign in again |
 | Sign in with Plex can't reach plex.tv        | Paste a token instead                                                                             |
-| A server shows as unreachable                | Enter an address the container can reach, such as a Docker service name                           |
+| A server shows as unreachable                | Check the inline error banner on the server card for the exact connection failure reason, and verify the container can reach that address |
 | Search works but playback fails              | Your reverse proxy is buffering or timing out. See the reverse proxy notes                         |
 | A new album doesn't show up                  | Wait for the next refresh, or disable and re-enable the server on the setup page                  |
 
