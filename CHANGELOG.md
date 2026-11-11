@@ -6,6 +6,23 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-11-11
+
+### Added
+
+- Streamlined two-column responsive form layout for server creation and editing with zero vertical scrolling on widescreen displays and automatic single-column mobile stacking.
+- Minimalist, accessible focus rings and neutral copy feedback matching shadcn design tokens across all dashboard controls.
+
+### Changed
+
+- Default scrobbling to disabled when adding a new server, hiding threshold controls until enabled.
+- Uncluttered search tester category tab selector into clean, lightweight pill toggles.
+- Standardized notification alerts with refined surface backgrounds and dismiss controls.
+
+### Removed
+
+- Removed uncalled `TitleMatches` helper function and cleaned up dead code.
+
 ## [1.4.0] - 2026-11-07
 
 ### Added
@@ -15,7 +32,6 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 - Short-lived HMAC-SHA256 signed media playback URLs (`/file/{id}?exp=...&sig=...`) with 30-minute validity and cryptographic tamper protection.
 - Comprehensive search engine overhaul mirroring BitChord client behavior: multi-word substring and prefix matching (e.g. `wee` -> `Sweet`, `frank oce` -> `Frank Ocean`), exact and partial token ranking, and multi-entity extraction.
 - Strict entity search isolation: albums and artists are strictly matched against their own names (`score > 0`), preventing unrelated entities from leaking into result lists.
-- Strict title matching in Search Tester for songs (`library.TitleMatches`), ensuring song previews only surface tracks whose title matches query tokens.
 - Multi-artist parsing and index consolidation: composite artist tags separated by `;`, `•`, `|`, or ` / ` are parsed into individual artist entries, eliminating fragmented combo profiles and correctly attributing collaborative tracks.
 - Standardized multi-artist display formatting across song rows and album cards using ` • `.
 - Category support in search responses: returns distinct matching `albums` alongside `tracks`.
