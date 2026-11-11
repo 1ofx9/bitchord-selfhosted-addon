@@ -296,7 +296,7 @@ func TestLoseAndLoserPrefixAndEntityIsolation(t *testing.T) {
 		}
 	}
 
-	// 2. Searching "loser" should match "Loser", but NOT "Deadbeat" under albums, and NOT "Tame Impala" under artists
+	// Searching "loser" matches "Loser", but not "Deadbeat" album or "Tame Impala" artist
 	resLoser := ix.Find("loser", 10)
 	if len(resLoser.Tracks) != 1 || resLoser.Tracks[0].ID != "t1" {
 		t.Fatalf("expected 'Loser' (t1) for 'loser', got %v", ids(resLoser.Tracks))
@@ -308,46 +308,16 @@ func TestLoseAndLoserPrefixAndEntityIsolation(t *testing.T) {
 		t.Errorf("expected 0 artists matching 'loser', got %v", resLoser.Artists)
 	}
 
-	// 3. Searching "deadbeat" should match album "Deadbeat"
+	// Searching "deadbeat" matches album "Deadbeat"
 	resDeadbeat := ix.Find("deadbeat", 10)
 	if len(resDeadbeat.Albums) != 1 || resDeadbeat.Albums[0].Name != "Deadbeat" {
 		t.Errorf("expected album 'Deadbeat' for query 'deadbeat', got %v", resDeadbeat.Albums)
 	}
 
-	// 4. Searching "tame" should match artist "Tame Impala"
+	// Searching "tame" matches artist "Tame Impala"
 	resTame := ix.Find("tame", 10)
 	if len(resTame.Artists) != 1 || resTame.Artists[0].Name != "Tame Impala" {
 		t.Errorf("expected artist 'Tame Impala' for query 'tame', got %v", resTame.Artists)
-	}
-}
-
-func TestTitleMatches(t *testing.T) {
-	cases := []struct {
-		title string
-		query string
-		want  bool
-	}{
-		{"Loser", "loser", true},
-		{"Loser", "lose", true},
-		{"Lose My Mind (feat. Doja Cat)", "lose", true},
-		{"Lose My Mind (feat. Doja Cat)", "lose my", true},
-		{"Sweet / I Thought You Wanted to Dance", "wee", true},
-		{"Sweet / I Thought You Wanted to Dance", "sweet thought", true},
-		{"In the End (2020 Remaster)", "in the end", true},
-		{"In the End", "in the end 2020 remaster", true},
-		{"Pirai Thedum", "mayak", false},
-		{"Kadhal Yen Kadhal", "mayak", false},
-		{"Naan Sonnadhum Mazhai", "mayak", false},
-		{"Mayakkama Kalakkama", "mayak", true},
-		{"", "test", false},
-		{"Test", "", false},
-	}
-
-	for _, tc := range cases {
-		got := TitleMatches(tc.title, tc.query)
-		if got != tc.want {
-			t.Errorf("TitleMatches(%q, %q) = %v, want %v", tc.title, tc.query, got, tc.want)
-		}
 	}
 }
 
@@ -407,7 +377,7 @@ func TestMultiArtistGroupingInIndex(t *testing.T) {
 
 	ix := NewIndex(tracks)
 
-	// Searching "weeknd" should find ONE unified "The Weeknd" artist with 5 tracks, not 5 separate combo artists!
+	// Verify multi-artist tracks consolidate into a single artist entry.
 	res := ix.Find("weeknd", 10)
 	if len(res.Artists) == 0 {
 		t.Fatalf("expected to find artist for 'weeknd'")

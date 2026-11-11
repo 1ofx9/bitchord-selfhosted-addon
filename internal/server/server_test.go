@@ -472,7 +472,7 @@ func TestBitChordAddonAuthEnforce(t *testing.T) {
 	})
 	handler := srv.handler()
 
-	// 1. Manifest must stay public without any auth headers
+	// Manifest is public without auth headers
 	manifestReq := httptest.NewRequest(http.MethodGet, "/plex-1/"+testSecret+"/manifest.json", nil)
 	manifestRec := httptest.NewRecorder()
 	handler.ServeHTTP(manifestRec, manifestReq)
@@ -484,7 +484,7 @@ func TestBitChordAddonAuthEnforce(t *testing.T) {
 		t.Fatalf("manifest body invalid: %v", manifestRec.Body.String())
 	}
 
-	// 2. Search must be rejected with 401 and WWW-Authenticate header when headers are missing
+	// Unauthenticated search is rejected with 401
 	searchReq := httptest.NewRequest(http.MethodGet, "/plex-1/"+testSecret+"/search?q=test", nil)
 	searchRec := httptest.NewRecorder()
 	handler.ServeHTTP(searchRec, searchReq)
@@ -496,7 +496,7 @@ func TestBitChordAddonAuthEnforce(t *testing.T) {
 		t.Fatalf("unexpected WWW-Authenticate: %q", authHeader)
 	}
 
-	// 3. Media route without valid signature in enforce mode must be rejected with 403
+	// Unsigned media request in enforce mode is rejected with 403
 	fileReq := httptest.NewRequest(http.MethodGet, "/plex-1/"+testSecret+"/file/101", nil)
 	fileRec := httptest.NewRecorder()
 	handler.ServeHTTP(fileRec, fileReq)
@@ -504,7 +504,7 @@ func TestBitChordAddonAuthEnforce(t *testing.T) {
 		t.Fatalf("unsigned file status = %d, want 403", fileRec.Code)
 	}
 
-	// 4. Media route with valid signature must succeed
+	// Signed media request succeeds
 	exp := time.Now().Add(10 * time.Minute).Unix()
 	sig := signMedia(testSecret, "101", exp)
 	fileReqSigned := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/plex-1/%s/file/101?exp=%d&sig=%s", testSecret, exp, sig), nil)

@@ -374,7 +374,7 @@ func TestServeBitChordAuthEnforcesByDefault(t *testing.T) {
 	logs := &syncBuffer{}
 	addrs := make(chan net.Addr, 1)
 	done := make(chan error, 1)
-	// Do NOT set BITCHORD_AUTH_MODE - default must be enforce
+	// Default auth mode must be enforce.
 	go func() {
 		done <- serve(ctx, testConfig(), st, newLogger("text", slog.LevelInfo, logs), nil, func(addr net.Addr) { addrs <- addr })
 	}()

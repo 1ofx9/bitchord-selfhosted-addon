@@ -397,7 +397,7 @@ func (ix *Index) Find(query string, limit int) Result {
 		}
 	}
 
-	// Tier 4: If no matches, strip variant/noise tokens (live, remaster, feat, etc.)
+	// Fallback without variant tokens (live, remaster, feat, etc.)
 	if len(strict) == 0 && len(loose) == 0 {
 		cleaned := stripNoise(q)
 		if len(cleaned) > 0 && len(cleaned) < len(q) {
@@ -416,7 +416,7 @@ func (ix *Index) Find(query string, limit int) Result {
 		}
 	}
 
-	// Tier 5: Substring matching (BitChord client behavior: e.g. "wee" matches "Sweet", "In Between Dreams")
+	// Substring fallback when no token matches exist
 	if len(strict) == 0 && len(loose) == 0 && len(cleanQ) >= 2 {
 		for i := range ix.tracks {
 			allMatch := true
@@ -451,8 +451,6 @@ func (ix *Index) Find(query string, limit int) Result {
 		out[n] = ix.tracks[i]
 	}
 	result.Tracks = out
-
-	// Extract matching Albums and Artists
 	result.Albums = ix.findAlbums(cleanQ, q, ordered)
 	result.Artists = ix.findArtists(cleanQ, q, ordered)
 
@@ -598,7 +596,7 @@ func (ix *Index) findAlbums(cleanQ string, q []string, matchedTracks []int) []Al
 			score += 250
 		}
 
-		// Only include albums whose own name or artist actually matched the query!
+		// Match against album name or artist.
 		if score > 0 {
 			if _, ok := matchedAlbumNames[strings.ToLower(alb.name)]; ok {
 				score += 100
@@ -675,7 +673,7 @@ func (ix *Index) findArtists(cleanQ string, q []string, matchedTracks []int) []A
 			score += 250
 		}
 
-		// Only include artists whose own name actually matched the query!
+		// Match against artist name.
 		if score > 0 {
 			if _, ok := matchedArtistNames[strings.ToLower(art.name)]; ok {
 				score += 100
@@ -745,46 +743,6 @@ func unique(tokens []string) []string {
 		}
 	}
 	return out
-}
-
-// TitleMatches reports whether the given track title strictly matches the query.
-// It returns true if the normalized title contains the query as a substring or
-// prefix, or if every non-noise token in the query matches at least one word in the
-// title (as an exact match, prefix, or substring).
-func TitleMatches(title, query string) bool {
-	cleanTitle := CleanString(title)
-	cleanQ := CleanString(query)
-	if cleanTitle == "" || cleanQ == "" {
-		return false
-	}
-	if strings.Contains(cleanTitle, cleanQ) {
-		return true
-	}
-	qTokens := unique(Tokens(query))
-	if len(qTokens) == 0 {
-		return false
-	}
-	cleaned := stripNoise(qTokens)
-	if len(cleaned) > 0 {
-		qTokens = cleaned
-	}
-	titleTokens := unique(Tokens(title))
-	if len(titleTokens) == 0 {
-		return false
-	}
-	for _, qTok := range qTokens {
-		matched := false
-		for _, tTok := range titleTokens {
-			if strings.Contains(tTok, qTok) {
-				matched = true
-				break
-			}
-		}
-		if !matched {
-			return false
-		}
-	}
-	return true
 }
 
 // SplitArtists splits a composite artist string into individual artist names

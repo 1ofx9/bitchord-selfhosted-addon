@@ -461,8 +461,7 @@ func (c *Client) startPlayback(track media.Track) {
 		return
 	}
 
-	// Cancel any existing timer from a previous track. Since that previous track
-	// was switched away before reaching its threshold, it will not be scrobbled!
+	// Cancel any pending scrobble timer for a previous track.
 	if c.tracker.timer != nil {
 		c.tracker.timer.Stop()
 	}
@@ -543,9 +542,7 @@ func (s *scrobbleBody) Close() error {
 	hitEOF := s.hitEOF
 	s.mu.Unlock()
 
-	// If the client aborted the stream before reading at least 50% of the stream bytes
-	// and without reaching EOF (e.g. user closed BitChord or skipped while buffering),
-	// immediately cancel the playback timer so it will never scrobble!
+	// Cancel the scrobble timer if playback was aborted early.
 	if total > 0 && read*2 < total && !hitEOF {
 		s.client.tracker.mu.Lock()
 		if s.client.tracker.trackID == s.trackID && !s.client.tracker.scrobbled {

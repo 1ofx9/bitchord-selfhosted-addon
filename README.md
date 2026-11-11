@@ -5,7 +5,7 @@
 </p>
 
 > [!NOTE]
-> This fork of [rairulyle/bitchord-selfhosted-addon](https://github.com/rairulyle/bitchord-selfhosted-addon) adds **Navidrome** (Subsonic API) support, featuring high-speed library sync via OpenSubsonic `search3`, concurrent album fallback, and bit-perfect audio streaming. Pre-built multi-arch images are published to `ghcr.io/1ofx9/bitchord-selfhosted-addon:latest`.
+> This fork of [rairulyle/bitchord-selfhosted-addon](https://github.com/rairulyle/bitchord-selfhosted-addon) adds **Navidrome** (Subsonic API) support and multi-server management. Pre-built multi-arch images are published to `ghcr.io/1ofx9/bitchord-selfhosted-addon:latest`.
 
 <div align="center">
   <video src="https://github.com/user-attachments/assets/54e40931-afd8-49c3-ab2f-c6598f182081" width="320" controls></video>
