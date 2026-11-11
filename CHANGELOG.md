@@ -6,6 +6,19 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-11
+
+### Added
+
+- Password-protected encrypted configuration backups and restores using AES-256-GCM authenticated encryption and PBKDF2-HMAC-SHA256 key derivation with automatic fallback for legacy plaintext backups.
+- Concurrent multi-server synchronization via the "Sync all" button in the setup header (`POST /setup/sync-all`).
+- Detailed offline error diagnostics banner on server cards and tooltip on unreachable status badges showing the exact connection failure reason.
+- Automatic build-time stylesheet cache-busting via SHA-256 asset hash injection (`?v={{styleHash}}`) and HTTP 304 conditional revalidation (`no-cache, max-age=0, must-revalidate`).
+
+### Security
+
+- Prevent admin account takeover or credential overwrite during backup restoration by unconditionally preserving the active instance's admin credentials regardless of uploaded payload contents.
+
 ## [1.4.2] - 2026-11-11
 
 ### Added
