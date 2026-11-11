@@ -198,14 +198,24 @@ func (a *app) regenerateSecret(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *app) exportBackup(w http.ResponseWriter, r *http.Request) {
+	passphrase := r.FormValue("passphrase")
+	if passphrase == "" && r.Method == http.MethodGet {
+		passphrase = r.URL.Query().Get("passphrase")
+	}
+
 	snap := a.Store.Snapshot()
 	snap.Admin = nil
-	raw, err := json.MarshalIndent(snap, "", "  ")
+	raw, err := store.EncryptSnapshot(snap, passphrase)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	filename := fmt.Sprintf("bitchord-addon-backup-%s.json", a.Now().Format("2006-01-02-150405"))
+	if passphrase != "" {
+		filename = fmt.Sprintf("bitchord-addon-backup-encrypted-%s.json", a.Now().Format("2006-01-02-150405"))
+	}
+
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
 	w.Header().Set("Cache-Control", "no-store")
@@ -215,6 +225,7 @@ func (a *app) exportBackup(w http.ResponseWriter, r *http.Request) {
 func (a *app) restoreBackup(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	var raw []byte
+	var passphrase string
 
 	contentType := r.Header.Get("Content-Type")
 	if strings.HasPrefix(contentType, "multipart/form-data") {
@@ -224,6 +235,7 @@ func (a *app) restoreBackup(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+		passphrase = r.FormValue("passphrase")
 		file, _, err := r.FormFile("backup_file")
 		if err != nil {
 			redirectNotice(w, r, "Restore failed: no backup file provided.")
@@ -237,6 +249,7 @@ func (a *app) restoreBackup(w http.ResponseWriter, r *http.Request) {
 		}
 		raw = buf
 	} else {
+		passphrase = r.FormValue("passphrase")
 		buf, err := io.ReadAll(r.Body)
 		if err != nil {
 			redirectNotice(w, r, "Restore failed: unable to read request body.")
@@ -245,9 +258,9 @@ func (a *app) restoreBackup(w http.ResponseWriter, r *http.Request) {
 		raw = buf
 	}
 
-	var snap store.Snapshot
-	if err := json.Unmarshal(raw, &snap); err != nil {
-		redirectNotice(w, r, "Restore failed: file is not valid JSON configuration.")
+	snap, err := store.DecryptSnapshot(raw, passphrase)
+	if err != nil {
+		redirectNotice(w, r, fmt.Sprintf("Restore failed: %s", err.Error()))
 		return
 	}
 
