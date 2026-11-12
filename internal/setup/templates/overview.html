@@ -219,9 +219,9 @@
           <div class="activity-row" data-kind="{{.Kind}}">
             <div class="activity-main">
               <span class="activity-icon-pill" title="{{.Kind}}">
-                {{if eq .Kind "sync"}}
+                {{if or (eq .Kind "sync") (eq .Kind "sync_error")}}
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
-                {{else if or (eq .Kind "scrobble") (eq .Kind "now_playing")}}
+                {{else if or (eq .Kind "scrobble") (eq .Kind "now_playing") (eq .Kind "playback")}}
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
                 {{else}}
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/></svg>
@@ -618,9 +618,9 @@ if (activityDetails) {
       var kind = row.dataset.kind || '';
       var matches = true;
       if (activeActivityFilter === 'sync') {
-        matches = (kind === 'sync');
+        matches = (kind === 'sync' || kind === 'sync_error');
       } else if (activeActivityFilter === 'playback') {
-        matches = (kind === 'scrobble' || kind === 'now_playing');
+        matches = (kind === 'scrobble' || kind === 'now_playing' || kind === 'playback');
       }
       row.style.display = matches ? 'flex' : 'none';
       if (matches) visibleCount++;
@@ -656,10 +656,10 @@ if (activityDetails) {
   });
 
   function getActivityIcon(kind) {
-    if (kind === 'sync') {
+    if (kind === 'sync' || kind === 'sync_error') {
       return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>';
     }
-    if (kind === 'scrobble' || kind === 'now_playing') {
+    if (kind === 'scrobble' || kind === 'now_playing' || kind === 'playback') {
       return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
     }
     return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/></svg>';

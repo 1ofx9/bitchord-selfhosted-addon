@@ -1589,3 +1589,38 @@ func TestRefreshAllServers(t *testing.T) {
 		t.Errorf("expected success notice in location %q", loc)
 	}
 }
+
+func TestRecentActivityEndpoint(t *testing.T) {
+	a := newTestApp(t)
+	a.signIn()
+
+	a.reg.RecordActivity("plex-1", "Plex Server", "sync", "Synced 100 tracks")
+	a.reg.RecordActivity("sub-1", "Navidrome", "now_playing", "Now playing: Track A")
+
+	rec := a.get("/setup/activity")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /setup/activity = %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "Synced 100 tracks") || !strings.Contains(body, "Now playing: Track A") {
+		t.Fatalf("expected both activities in /setup/activity response: %s", body)
+	}
+
+	recSync := a.get("/setup/activity?filter=sync")
+	if recSync.Code != http.StatusOK {
+		t.Fatalf("GET /setup/activity?filter=sync = %d", recSync.Code)
+	}
+	bodySync := recSync.Body.String()
+	if !strings.Contains(bodySync, "Synced 100 tracks") || strings.Contains(bodySync, "Now playing: Track A") {
+		t.Fatalf("expected only sync in filtered response: %s", bodySync)
+	}
+
+	recPlayback := a.get("/setup/activity?filter=playback")
+	if recPlayback.Code != http.StatusOK {
+		t.Fatalf("GET /setup/activity?filter=playback = %d", recPlayback.Code)
+	}
+	bodyPlayback := recPlayback.Body.String()
+	if strings.Contains(bodyPlayback, "Synced 100 tracks") || !strings.Contains(bodyPlayback, "Now playing: Track A") {
+		t.Fatalf("expected only playback in filtered response: %s", bodyPlayback)
+	}
+}

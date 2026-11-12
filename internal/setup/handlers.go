@@ -685,9 +685,16 @@ func (a *app) testSearch(w http.ResponseWriter, r *http.Request) {
 
 func (a *app) recentActivity(w http.ResponseWriter, r *http.Request) {
 	now := a.Now()
+	filter := r.URL.Query().Get("filter")
 	raw := a.Registry.RecentActivity()
 	items := make([]ActivityView, 0, len(raw))
 	for _, act := range raw {
+		if filter == "sync" && act.Kind != "sync" && act.Kind != "sync_error" {
+			continue
+		}
+		if filter == "playback" && act.Kind != "now_playing" && act.Kind != "scrobble" && act.Kind != "playback" {
+			continue
+		}
 		items = append(items, ActivityView{
 			TimeAgo: since(act.Time, now),
 			Slug:    act.Slug,

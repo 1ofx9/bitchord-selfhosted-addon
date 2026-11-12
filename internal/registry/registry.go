@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -60,6 +61,7 @@ func DisplayName(kind, label string) string {
 }
 
 type Activity struct {
+	Seq     uint64
 	Time    time.Time
 	Slug    string
 	Server  string
@@ -77,16 +79,23 @@ type Status struct {
 	LastError string
 }
 
+const (
+	maxSyncActivities     = 10
+	maxPlaybackActivities = 30
+)
+
 type Registry struct {
-	opts       Options
-	clientID   string
-	mu         sync.RWMutex
-	entries    map[string]*Entry
-	pending    map[string]*handover
-	handovers  sync.WaitGroup
-	changed    chan struct{}
-	activityMu sync.RWMutex
-	activities []Activity
+	opts               Options
+	clientID           string
+	mu                 sync.RWMutex
+	entries            map[string]*Entry
+	pending            map[string]*handover
+	handovers          sync.WaitGroup
+	changed            chan struct{}
+	activityMu         sync.RWMutex
+	activitySeq        uint64
+	syncActivities     []Activity
+	playbackActivities []Activity
 }
 
 // handover is a restarted server's new entry, waiting for its first refresh
@@ -161,27 +170,76 @@ func (r *Registry) Lookup(slug string) (*Entry, bool) {
 	return entry, ok
 }
 
+func isSyncActivity(kind string) bool {
+	return kind == "sync" || strings.HasPrefix(kind, "sync")
+}
+
 func (r *Registry) RecordActivity(slug, server, kind, message string) {
 	r.activityMu.Lock()
 	defer r.activityMu.Unlock()
+	r.activitySeq++
 	act := Activity{
+		Seq:     r.activitySeq,
 		Time:    time.Now(),
 		Slug:    slug,
 		Server:  server,
 		Kind:    kind,
 		Message: message,
 	}
-	r.activities = append([]Activity{act}, r.activities...)
-	if len(r.activities) > 30 {
-		r.activities = r.activities[:30]
+	if isSyncActivity(kind) {
+		r.syncActivities = append([]Activity{act}, r.syncActivities...)
+		if len(r.syncActivities) > maxSyncActivities {
+			r.syncActivities = r.syncActivities[:maxSyncActivities]
+		}
+	} else {
+		r.playbackActivities = append([]Activity{act}, r.playbackActivities...)
+		if len(r.playbackActivities) > maxPlaybackActivities {
+			r.playbackActivities = r.playbackActivities[:maxPlaybackActivities]
+		}
 	}
 }
 
 func (r *Registry) RecentActivity() []Activity {
 	r.activityMu.RLock()
 	defer r.activityMu.RUnlock()
-	res := make([]Activity, len(r.activities))
-	copy(res, r.activities)
+
+	res := make([]Activity, 0, len(r.syncActivities)+len(r.playbackActivities))
+	i, j := 0, 0
+	for i < len(r.syncActivities) && j < len(r.playbackActivities) {
+		sAct := r.syncActivities[i]
+		pAct := r.playbackActivities[j]
+		if sAct.Time.After(pAct.Time) || (sAct.Time.Equal(pAct.Time) && sAct.Seq > pAct.Seq) {
+			res = append(res, sAct)
+			i++
+		} else {
+			res = append(res, pAct)
+			j++
+		}
+	}
+	for i < len(r.syncActivities) {
+		res = append(res, r.syncActivities[i])
+		i++
+	}
+	for j < len(r.playbackActivities) {
+		res = append(res, r.playbackActivities[j])
+		j++
+	}
+	return res
+}
+
+func (r *Registry) RecentSyncActivity() []Activity {
+	r.activityMu.RLock()
+	defer r.activityMu.RUnlock()
+	res := make([]Activity, len(r.syncActivities))
+	copy(res, r.syncActivities)
+	return res
+}
+
+func (r *Registry) RecentPlaybackActivity() []Activity {
+	r.activityMu.RLock()
+	defer r.activityMu.RUnlock()
+	res := make([]Activity, len(r.playbackActivities))
+	copy(res, r.playbackActivities)
 	return res
 }
 

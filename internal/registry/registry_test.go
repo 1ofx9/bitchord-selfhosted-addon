@@ -584,11 +584,37 @@ func TestRegistryActivity(t *testing.T) {
 		t.Errorf("unexpected order of activities: %+v", recent)
 	}
 
-	// Verify ring buffer limit of 30
-	for i := 0; i < 35; i++ {
-		r.RecordActivity("server-1", "My Server", "test", fmt.Sprintf("event %d", i))
+	// Verify sync activities are capped at 10
+	for i := 0; i < 15; i++ {
+		r.RecordActivity("server-1", "My Server", "sync", fmt.Sprintf("sync %d", i))
 	}
-	if len(r.RecentActivity()) != 30 {
-		t.Errorf("expected activity ring buffer capped at 30, got %d", len(r.RecentActivity()))
+	if syncs := r.RecentSyncActivity(); len(syncs) != 10 {
+		t.Fatalf("expected 10 sync activities, got %d", len(syncs))
+	}
+
+	// Verify now_playing / playback activities are capped at 30
+	for i := 0; i < 35; i++ {
+		r.RecordActivity("server-1", "My Server", "now_playing", fmt.Sprintf("now playing %d", i))
+	}
+	if playbacks := r.RecentPlaybackActivity(); len(playbacks) != 30 {
+		t.Fatalf("expected 30 playback activities, got %d", len(playbacks))
+	}
+
+	// Verify separate tracking: now_playing activities do not evict sync activities
+	if syncs := r.RecentSyncActivity(); len(syncs) != 10 {
+		t.Fatalf("expected sync activities preserved at 10 after playback flood, got %d", len(syncs))
+	}
+
+	// Verify merged RecentActivity contains both (10 sync + 30 playback = 40)
+	all := r.RecentActivity()
+	if len(all) != 40 {
+		t.Fatalf("expected 40 total merged activities, got %d", len(all))
+	}
+
+	// Verify reverse chronological order
+	for i := 0; i < len(all)-1; i++ {
+		if all[i].Time.Before(all[i+1].Time) {
+			t.Errorf("activities out of chronological order at index %d", i)
+		}
 	}
 }
