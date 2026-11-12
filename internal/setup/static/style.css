@@ -1504,8 +1504,24 @@ details.accordion .accordion-content {
   border-top: none;
   border-radius: 0 0 8px 8px;
   padding: 14px;
-  max-height: 520px;
+  max-height: 580px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+.search-content-body::-webkit-scrollbar {
+  width: 6px;
+}
+.search-content-body::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 3px;
+}
+.search-content-body::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+.search-content-body::-webkit-scrollbar-track {
+  background: transparent;
 }
 .search-empty-box {
   padding: 32px 16px;
@@ -1541,7 +1557,6 @@ details.accordion .accordion-content {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  overflow: hidden;
 }
 .search-track-item {
   display: flex;
@@ -1553,8 +1568,14 @@ details.accordion .accordion-content {
   gap: 12px;
   transition: background-color 0.12s ease;
 }
+.search-track-item:first-child {
+  border-top-left-radius: 7px;
+  border-top-right-radius: 7px;
+}
 .search-track-item:last-child {
   border-bottom: none;
+  border-bottom-left-radius: 7px;
+  border-bottom-right-radius: 7px;
 }
 .search-track-item:hover {
   background: var(--surface-raised);

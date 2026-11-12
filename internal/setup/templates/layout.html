@@ -65,9 +65,10 @@
 (function () {
   var notice = document.querySelector('.notice');
   if (notice) {
-    if (location.search.indexOf('notice=') !== -1) {
+    if (location.search.indexOf('notice=') !== -1 || location.search.indexOf('error=') !== -1) {
       var url = new URL(location.href);
       url.searchParams.delete('notice');
+      url.searchParams.delete('error');
       history.replaceState(null, '', url);
     }
     function dismiss() {
@@ -79,7 +80,8 @@
     if (closeBtn) {
       closeBtn.addEventListener('click', dismiss);
     }
-    setTimeout(dismiss, 5000);
+    var timeout = notice.classList.contains('error') ? 8000 : 5000;
+    setTimeout(dismiss, timeout);
   }
 
   var themeBtn = document.getElementById('theme-toggle');

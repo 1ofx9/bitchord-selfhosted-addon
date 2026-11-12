@@ -347,6 +347,57 @@
       b.textContent = 'Syncing…';
     });
   });
+
+  var restoreFileInput = document.getElementById('backup-file-input');
+  var restoreForm = document.querySelector('.restore-form');
+  var restorePassInput = restoreForm ? restoreForm.querySelector('input[name="passphrase"]') : null;
+  var isEncryptedBackupFile = false;
+
+  if (restoreFileInput && restorePassInput) {
+    restoreFileInput.addEventListener('change', function () {
+      isEncryptedBackupFile = false;
+      var file = restoreFileInput.files && restoreFileInput.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        try {
+          var parsed = JSON.parse(e.target.result);
+          if (parsed && (parsed.ciphertext || (parsed.version === 1 && parsed.salt))) {
+            isEncryptedBackupFile = true;
+            restorePassInput.required = true;
+            restorePassInput.placeholder = 'Password (required)';
+            restorePassInput.focus();
+          } else {
+            restorePassInput.required = false;
+            restorePassInput.placeholder = 'Password (if encrypted)';
+          }
+        } catch (err) {}
+      };
+      reader.readAsText(file);
+    });
+
+    if (restoreForm) {
+      restoreForm.addEventListener('submit', function (e) {
+        if (isEncryptedBackupFile && !restorePassInput.value.trim()) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          alert('This backup is encrypted. Please enter the backup password before restoring.');
+          restorePassInput.focus();
+          return false;
+        }
+      });
+    }
+  }
+
+  if (location.search.indexOf('error=') !== -1 || (document.querySelector('.notice.error') && document.querySelector('.notice.error').textContent.indexOf('Restore failed') !== -1)) {
+    var backupAccordion = document.querySelector('.backup-accordion');
+    if (backupAccordion) {
+      backupAccordion.open = true;
+      try {
+        backupAccordion.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } catch (err) {}
+    }
+  }
 })();
 
 document.querySelectorAll('.accordion.search-box').forEach(function (box) {
@@ -491,14 +542,14 @@ document.querySelectorAll('.accordion.search-box').forEach(function (box) {
         html += '<div class="search-section">' +
           '<div class="search-section-title">Songs <span class="search-section-count">(' + tracks.length + ')</span></div>' +
           '<div class="search-track-list">' +
-          tracks.slice(0, 8).map(renderTrackItem).join('') +
+          tracks.map(renderTrackItem).join('') +
           '</div></div>';
       }
       if (albums.length > 0) {
         html += '<div class="search-section">' +
           '<div class="search-section-title">Albums <span class="search-section-count">(' + albums.length + ')</span></div>' +
           '<div class="search-album-grid">' +
-          albums.slice(0, 6).map(renderAlbumCard).join('') +
+          albums.map(renderAlbumCard).join('') +
           '</div></div>';
       }
     } else if (activeTab === 'songs') {
@@ -583,6 +634,13 @@ document.querySelectorAll('.accordion.search-box').forEach(function (box) {
       runSearch();
     }
   });
+
+  out.addEventListener('wheel', function (e) {
+    var scroller = out.querySelector('.search-content-body');
+    if (scroller && scroller.scrollHeight > scroller.clientHeight) {
+      scroller.scrollTop += e.deltaY;
+    }
+  }, { passive: true });
 });
 
 document.addEventListener('keydown', function (e) {

@@ -62,6 +62,10 @@ func redirectNotice(w http.ResponseWriter, r *http.Request, notice string) {
 	http.Redirect(w, r, "/setup?notice="+url.QueryEscape(notice), http.StatusSeeOther)
 }
 
+func redirectError(w http.ResponseWriter, r *http.Request, err string) {
+	http.Redirect(w, r, "/setup?error="+url.QueryEscape(err), http.StatusSeeOther)
+}
+
 // ---- password and session
 
 func (a *app) createPassword(w http.ResponseWriter, r *http.Request) {
@@ -231,20 +235,20 @@ func (a *app) restoreBackup(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(contentType, "multipart/form-data") {
 		if r.MultipartForm == nil {
 			if err := r.ParseMultipartForm(1 << 20); err != nil {
-				redirectNotice(w, r, "Restore failed: invalid upload format or file too large.")
+				redirectError(w, r, "Restore failed: invalid upload format or file too large.")
 				return
 			}
 		}
 		passphrase = r.FormValue("passphrase")
 		file, _, err := r.FormFile("backup_file")
 		if err != nil {
-			redirectNotice(w, r, "Restore failed: no backup file provided.")
+			redirectError(w, r, "Restore failed: no backup file provided.")
 			return
 		}
 		defer file.Close()
 		buf, err := io.ReadAll(file)
 		if err != nil {
-			redirectNotice(w, r, "Restore failed: unable to read uploaded file.")
+			redirectError(w, r, "Restore failed: unable to read uploaded file.")
 			return
 		}
 		raw = buf
@@ -252,7 +256,7 @@ func (a *app) restoreBackup(w http.ResponseWriter, r *http.Request) {
 		passphrase = r.FormValue("passphrase")
 		buf, err := io.ReadAll(r.Body)
 		if err != nil {
-			redirectNotice(w, r, "Restore failed: unable to read request body.")
+			redirectError(w, r, "Restore failed: unable to read request body.")
 			return
 		}
 		raw = buf
@@ -260,12 +264,12 @@ func (a *app) restoreBackup(w http.ResponseWriter, r *http.Request) {
 
 	snap, err := store.DecryptSnapshot(raw, passphrase)
 	if err != nil {
-		redirectNotice(w, r, fmt.Sprintf("Restore failed: %s", err.Error()))
+		redirectError(w, r, fmt.Sprintf("Restore failed: %s", err.Error()))
 		return
 	}
 
 	if err := a.Store.Restore(snap); err != nil {
-		redirectNotice(w, r, fmt.Sprintf("Restore failed: %s", err.Error()))
+		redirectError(w, r, fmt.Sprintf("Restore failed: %s", err.Error()))
 		return
 	}
 
