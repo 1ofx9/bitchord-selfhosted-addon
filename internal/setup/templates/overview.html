@@ -214,7 +214,7 @@
           <button type="button" class="activity-tab" data-filter="sync" role="tab" aria-selected="false">Syncs</button>
           <button type="button" class="activity-tab" data-filter="playback" role="tab" aria-selected="false">Playback</button>
         </div>
-        <form method="post" action="/setup/activity/clear" class="activity-clear-form" onsubmit="return confirm('Clear recent activity log?')">
+        <form method="post" action="/setup/activity/clear" class="activity-clear-form">
           <input type="hidden" name="csrf" value="{{.CSRF}}">
           <input type="hidden" name="filter" value="all" class="activity-clear-filter">
           <button type="submit" class="activity-clear-btn" title="Clear activity log">Clear</button>
