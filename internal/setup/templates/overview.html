@@ -208,10 +208,17 @@
     </summary>
     <div class="accordion-content">
       <p class="hint" style="margin: 0 0 8px 0;">Latest sync and playback events across your servers.</p>
-      <div class="activity-tabs" role="tablist" aria-label="Activity filter">
-        <button type="button" class="activity-tab active" data-filter="all" role="tab" aria-selected="true">All</button>
-        <button type="button" class="activity-tab" data-filter="sync" role="tab" aria-selected="false">Syncs</button>
-        <button type="button" class="activity-tab" data-filter="playback" role="tab" aria-selected="false">Playback</button>
+      <div class="activity-bar">
+        <div class="activity-tabs" role="tablist" aria-label="Activity filter">
+          <button type="button" class="activity-tab active" data-filter="all" role="tab" aria-selected="true">All</button>
+          <button type="button" class="activity-tab" data-filter="sync" role="tab" aria-selected="false">Syncs</button>
+          <button type="button" class="activity-tab" data-filter="playback" role="tab" aria-selected="false">Playback</button>
+        </div>
+        <form method="post" action="/setup/activity/clear" class="activity-clear-form" onsubmit="return confirm('Clear recent activity log?')">
+          <input type="hidden" name="csrf" value="{{.CSRF}}">
+          <input type="hidden" name="filter" value="all" class="activity-clear-filter">
+          <button type="submit" class="activity-clear-btn" title="Clear activity log">Clear</button>
+        </form>
       </div>
       <div class="activity-list">
         {{if .Activities}}
@@ -642,6 +649,9 @@ if (activityDetails) {
     }
   }
 
+  var clearForm = activityDetails.querySelector('.activity-clear-form');
+  var clearFilterInput = activityDetails.querySelector('.activity-clear-filter');
+
   activityTabs.forEach(function (tab) {
     tab.addEventListener('click', function () {
       activityTabs.forEach(function (t) {
@@ -651,9 +661,52 @@ if (activityDetails) {
       tab.classList.add('active');
       tab.setAttribute('aria-selected', 'true');
       activeActivityFilter = tab.dataset.filter;
+      if (clearFilterInput) {
+        clearFilterInput.value = activeActivityFilter;
+      }
       filterActivityRows();
     });
   });
+
+  if (clearForm) {
+    clearForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var label = activeActivityFilter === 'all' ? 'recent activity' : activeActivityFilter + ' activity';
+      if (!confirm('Clear ' + label + ' log?')) return;
+      var formData = new FormData(clearForm);
+      formData.set('filter', activeActivityFilter);
+      fetch('/setup/activity/clear', {
+        method: 'POST',
+        body: formData,
+        headers: { 'Accept': 'application/json' }
+      })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data && data.ok) {
+          if (activeActivityFilter === 'all') {
+            activityList.innerHTML = '<p class="hint empty-activity">No recent activity yet.</p>';
+          } else {
+            var rows = activityList.querySelectorAll('.activity-row');
+            rows.forEach(function (row) {
+              var kind = row.dataset.kind || '';
+              if (activeActivityFilter === 'sync' && (kind === 'sync' || kind === 'sync_error')) {
+                row.remove();
+              } else if (activeActivityFilter === 'playback' && (kind === 'scrobble' || kind === 'now_playing' || kind === 'playback')) {
+                row.remove();
+              }
+            });
+            if (activityList.querySelectorAll('.activity-row').length === 0) {
+              activityList.innerHTML = '<p class="hint empty-activity">No recent activity yet.</p>';
+            }
+          }
+          filterActivityRows();
+        }
+      })
+      .catch(function () {
+        clearForm.submit();
+      });
+    });
+  }
 
   function getActivityIcon(kind) {
     if (kind === 'sync' || kind === 'sync_error') {

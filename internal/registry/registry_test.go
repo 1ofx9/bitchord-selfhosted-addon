@@ -617,4 +617,27 @@ func TestRegistryActivity(t *testing.T) {
 			t.Errorf("activities out of chronological order at index %d", i)
 		}
 	}
+
+	// Verify ClearActivity for specific categories and all
+	r.ClearActivity("sync")
+	if len(r.RecentSyncActivity()) != 0 {
+		t.Fatalf("expected sync activities cleared, got %d", len(r.RecentSyncActivity()))
+	}
+	if len(r.RecentPlaybackActivity()) != 30 {
+		t.Fatalf("expected playback activities untouched, got %d", len(r.RecentPlaybackActivity()))
+	}
+
+	r.RecordActivity("server-1", "My Server", "sync", "new sync")
+	r.ClearActivity("playback")
+	if len(r.RecentPlaybackActivity()) != 0 {
+		t.Fatalf("expected playback activities cleared, got %d", len(r.RecentPlaybackActivity()))
+	}
+	if len(r.RecentSyncActivity()) != 1 {
+		t.Fatalf("expected sync activity preserved, got %d", len(r.RecentSyncActivity()))
+	}
+
+	r.ClearActivity("all")
+	if len(r.RecentActivity()) != 0 {
+		t.Fatalf("expected all activities cleared, got %d", len(r.RecentActivity()))
+	}
 }

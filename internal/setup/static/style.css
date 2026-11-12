@@ -1251,12 +1251,46 @@ details.accordion .accordion-content {
   box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ring);
 }
 
-/* Activity Filter Tabs */
+/* Activity Filter Tabs & Header Bar */
+.activity-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 8px 0 14px;
+}
 .activity-tabs {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 8px 0 14px;
+}
+.activity-clear-form {
+  margin: 0;
+  display: inline-flex;
+}
+.activity-clear-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.4;
+  display: inline-flex;
+  align-items: center;
+}
+.activity-clear-btn:hover {
+  background: var(--surface-raised);
+  color: var(--danger, #ef4444);
+  border-color: var(--danger-border, #fca5a5);
+}
+.activity-clear-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ring);
 }
 .activity-tab {
   background: transparent;

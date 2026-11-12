@@ -709,6 +709,16 @@ func (a *app) recentActivity(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (a *app) clearActivity(w http.ResponseWriter, r *http.Request) {
+	filter := r.FormValue("filter")
+	a.Registry.ClearActivity(filter)
+	if strings.Contains(r.Header.Get("Accept"), "application/json") || r.Header.Get("X-Requested-With") == "XMLHttpRequest" {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+		return
+	}
+	redirectNotice(w, r, "Activity log cleared.")
+}
+
 // ---- JSON endpoints used by the form's buttons
 
 type testRequest struct {

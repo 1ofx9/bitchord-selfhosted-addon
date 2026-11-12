@@ -243,6 +243,20 @@ func (r *Registry) RecentPlaybackActivity() []Activity {
 	return res
 }
 
+func (r *Registry) ClearActivity(filter string) {
+	r.activityMu.Lock()
+	defer r.activityMu.Unlock()
+	switch filter {
+	case "sync":
+		r.syncActivities = nil
+	case "playback":
+		r.playbackActivities = nil
+	default:
+		r.syncActivities = nil
+		r.playbackActivities = nil
+	}
+}
+
 func (r *Registry) Status(slug string) (Status, bool) {
 	entry, ok := r.Lookup(slug)
 	if !ok {

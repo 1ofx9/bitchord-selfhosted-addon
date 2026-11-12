@@ -1623,4 +1623,25 @@ func TestRecentActivityEndpoint(t *testing.T) {
 	if strings.Contains(bodyPlayback, "Synced 100 tracks") || !strings.Contains(bodyPlayback, "Now playing: Track A") {
 		t.Fatalf("expected only playback in filtered response: %s", bodyPlayback)
 	}
+
+	// POST /setup/activity/clear with filter=sync
+	clearSyncRec := a.form("/setup/activity/clear", url.Values{"filter": {"sync"}})
+	if clearSyncRec.Code != http.StatusSeeOther {
+		t.Fatalf("POST /setup/activity/clear = %d, want 303", clearSyncRec.Code)
+	}
+	if len(a.reg.RecentSyncActivity()) != 0 {
+		t.Fatalf("expected sync activities cleared, got %d", len(a.reg.RecentSyncActivity()))
+	}
+	if len(a.reg.RecentPlaybackActivity()) != 1 {
+		t.Fatalf("expected playback activities untouched, got %d", len(a.reg.RecentPlaybackActivity()))
+	}
+
+	// POST /setup/activity/clear with filter=all
+	clearAllRec := a.form("/setup/activity/clear", url.Values{"filter": {"all"}})
+	if clearAllRec.Code != http.StatusSeeOther {
+		t.Fatalf("POST /setup/activity/clear = %d, want 303", clearAllRec.Code)
+	}
+	if len(a.reg.RecentActivity()) != 0 {
+		t.Fatalf("expected all activities cleared, got %d", len(a.reg.RecentActivity()))
+	}
 }

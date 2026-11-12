@@ -54,6 +54,7 @@ type Runtime interface {
 	Refresh(ctx context.Context, slug string) error
 	DefaultInterval() time.Duration
 	RecentActivity() []registry.Activity
+	ClearActivity(filter string)
 	Search(slug, query string, limit int) (registry.SearchResult, bool)
 	Probe(ctx context.Context, server store.Server) (registry.Probe, error)
 	PlexPIN(ctx context.Context) (registry.PIN, error)
@@ -199,6 +200,7 @@ func (a *app) handler() http.Handler {
 	mux.HandleFunc("GET /setup/servers/{slug}/test-search", a.testSearch)
 	mux.HandleFunc("GET /setup/servers/{slug}/search", a.testSearch)
 	mux.HandleFunc("GET /setup/activity", a.recentActivity)
+	mux.HandleFunc("POST /setup/activity/clear", a.clearActivity)
 	mux.HandleFunc("POST /setup/plex/pin", a.plexPIN)
 	mux.HandleFunc("GET /setup/plex/pin/{id}", a.plexPoll)
 	mux.HandleFunc("POST /setup/jellyfin/signin", a.jellyfinSignIn)
