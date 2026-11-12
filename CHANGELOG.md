@@ -6,6 +6,14 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-11-13
+
+### Added
+
+- Independent ring buffer tracking for sync (max 10) and playback (max 30) events with monotonic sequence IDs, preventing playback activity from evicting sync history.
+- Manual activity log clearing via the setup interface and `POST /setup/activity/clear`, supporting category-specific clearing (`sync`, `playback`) and full activity clearing with client-side optimistic UI updates.
+- Optional activity category filtering query parameter (`?filter=sync`, `?filter=playback`) on the `GET /setup/activity` JSON endpoint.
+
 ## [1.5.0] - 2026-11-11
 
 ### Added
