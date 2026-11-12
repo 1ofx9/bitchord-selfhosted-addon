@@ -6,6 +6,19 @@ Entries are written **one line per paragraph and bullet** (no hard-wrapping) so 
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-11-13
+
+### Added
+
+- In-memory thread-safe LRU artwork cache with SHA-256 ETag generation, HTTP 304 Not Modified validation, and capacity-based pruning for Plex, Jellyfin, and Navidrome cover art (`/art/{id}`).
+- Typo and fuzzy search tolerance powered by Damerau-Levenshtein distance calculation, handling character omissions, insertions, substitutions, and adjacent transpositions across tracks, albums, and artists.
+- Bidirectional synonym and abbreviation expansion in the search index for common audio metadata terms (`ft` / `feat` / `featuring`, `vol` / `volume`, `pt` / `part`, `ost` / `soundtrack`, `vs` / `versus`).
+
+### Fixed
+
+- Search tester scrolling in Songs and Albums tabs, and removed truncation limits in the "All" tab so all matching tracks and albums render completely.
+- Backup restore error handling by routing restore failures to dedicated error alert banners, auto-detecting encrypted backup files client-side to enforce password entry, and keeping the backup accordion open on failure.
+
 ## [1.5.1] - 2026-11-13
 
 ### Added
