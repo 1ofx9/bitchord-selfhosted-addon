@@ -107,7 +107,16 @@ func NewIndex(tracks []media.Track) *Index {
 
 		title := unique(Tokens(t.Title))
 		ix.titleTokens[i] = title
+		titleHits := map[string]struct{}{}
 		for _, token := range title {
+			titleHits[token] = struct{}{}
+			if syns, ok := tokenSynonyms[token]; ok {
+				for _, syn := range syns {
+					titleHits[syn] = struct{}{}
+				}
+			}
+		}
+		for token := range titleHits {
 			ix.titlePosts[token] = append(ix.titlePosts[token], i)
 		}
 		everything := strings.Join([]string{t.Artist, t.AlbumArtist, t.Album}, " ")
@@ -126,6 +135,17 @@ func NewIndex(tracks []media.Track) *Index {
 		}
 		for _, form := range bitchordWords(everything) {
 			hits[form] = struct{}{}
+		}
+		synHits := map[string]struct{}{}
+		for token := range hits {
+			if syns, ok := tokenSynonyms[token]; ok {
+				for _, syn := range syns {
+					synHits[syn] = struct{}{}
+				}
+			}
+		}
+		for syn := range synHits {
+			hits[syn] = struct{}{}
 		}
 		for token := range hits {
 			ix.postings[token] = append(ix.postings[token], i)
@@ -232,6 +252,20 @@ func (ix *Index) Get(id string) (media.Track, bool) {
 		return media.Track{}, false
 	}
 	return ix.tracks[i], true
+}
+
+var tokenSynonyms = map[string][]string{
+	"ft":         {"feat", "featuring"},
+	"feat":       {"ft", "featuring"},
+	"featuring":  {"feat", "ft"},
+	"pt":         {"part"},
+	"part":       {"pt"},
+	"vol":        {"volume"},
+	"volume":     {"vol"},
+	"ost":        {"soundtrack"},
+	"soundtrack": {"ost"},
+	"vs":         {"versus"},
+	"versus":     {"vs"},
 }
 
 var noiseWords = map[string]struct{}{
@@ -435,6 +469,16 @@ func (ix *Index) Find(query string, limit int) Result {
 		}
 	}
 
+	// Fuzzy / Typo fallback when all exact, prefix, noise-stripped, and substring searches yielded nothing
+	if len(strict) == 0 && len(loose) == 0 {
+		for _, i := range ix.fuzzy(q) {
+			if _, dup := seen[i]; !dup {
+				seen[i] = struct{}{}
+				loose = append(loose, i)
+			}
+		}
+	}
+
 	ix.rank(strict, cleanQ, q)
 	ix.rank(loose, cleanQ, q)
 	result := Result{
@@ -492,6 +536,147 @@ func (ix *Index) fallback(q []string, prefix bool) []int {
 	return out
 }
 
+func damerauLevenshtein(a, b string, maxDist int) int {
+	la, lb := len(a), len(b)
+	if la == 0 {
+		return lb
+	}
+	if lb == 0 {
+		return la
+	}
+	diff := la - lb
+	if diff < 0 {
+		diff = -diff
+	}
+	if diff > maxDist {
+		return maxDist + 1
+	}
+
+	r0 := make([]int, lb+1)
+	r1 := make([]int, lb+1)
+	r2 := make([]int, lb+1)
+
+	for j := 0; j <= lb; j++ {
+		r1[j] = j
+	}
+
+	for i := 1; i <= la; i++ {
+		r2[0] = i
+		minInRow := i
+		for j := 1; j <= lb; j++ {
+			cost := 0
+			if a[i-1] != b[j-1] {
+				cost = 1
+			}
+			del := r1[j] + 1
+			ins := r2[j-1] + 1
+			sub := r1[j-1] + cost
+			val := min(del, min(ins, sub))
+
+			if i > 1 && j > 1 && a[i-1] == b[j-2] && a[i-2] == b[j-1] {
+				trans := r0[j-2] + 1
+				if trans < val {
+					val = trans
+				}
+			}
+			r2[j] = val
+			if val < minInRow {
+				minInRow = val
+			}
+		}
+		if minInRow > maxDist {
+			return maxDist + 1
+		}
+		copy(r0, r1)
+		copy(r1, r2)
+	}
+	return r1[lb]
+}
+
+func (ix *Index) fuzzyKeys(token string) []string {
+	if len(token) < 4 {
+		return nil
+	}
+	maxDist := 1
+	if len(token) >= 8 {
+		maxDist = 2
+	}
+	type match struct {
+		key  string
+		dist int
+	}
+	var matches []match
+	for _, key := range ix.sortedKeys {
+		d := damerauLevenshtein(token, key, maxDist)
+		if d <= maxDist {
+			matches = append(matches, match{key: key, dist: d})
+		}
+	}
+	if len(matches) == 0 {
+		return nil
+	}
+	sort.Slice(matches, func(i, j int) bool {
+		if matches[i].dist != matches[j].dist {
+			return matches[i].dist < matches[j].dist
+		}
+		return len(matches[i].key) < len(matches[j].key)
+	})
+	limit := 10
+	if len(matches) < limit {
+		limit = len(matches)
+	}
+	out := make([]string, limit)
+	for i := 0; i < limit; i++ {
+		out[i] = matches[i].key
+	}
+	return out
+}
+
+func (ix *Index) fuzzy(q []string) []int {
+	lists := make([][]int, len(q))
+	for n, token := range q {
+		if exact, ok := ix.postings[token]; ok && len(exact) > 0 {
+			lists[n] = exact
+			continue
+		}
+		if len(token) >= 2 {
+			if pfx := ix.lookupPostings(token, true); len(pfx) > 0 {
+				lists[n] = pfx
+				continue
+			}
+		}
+		if len(token) < 4 {
+			return nil
+		}
+		matchedKeys := ix.fuzzyKeys(token)
+		if len(matchedKeys) == 0 {
+			return nil
+		}
+		var list []int
+		seen := make(map[int]struct{})
+		for _, key := range matchedKeys {
+			for _, id := range ix.postings[key] {
+				if _, ok := seen[id]; !ok {
+					seen[id] = struct{}{}
+					list = append(list, id)
+				}
+			}
+		}
+		sort.Ints(list)
+		lists[n] = list
+	}
+
+	sort.Slice(lists, func(a, b int) bool { return len(lists[a]) < len(lists[b]) })
+	result := slices.Clone(lists[0])
+	for _, next := range lists[1:] {
+		result = intersect(result, next)
+		if len(result) == 0 {
+			return nil
+		}
+	}
+	return result
+}
+
 func (ix *Index) rank(candidates []int, cleanQ string, q []string) {
 	wanted := make(map[string]struct{}, len(q))
 	for _, token := range q {
@@ -521,6 +706,20 @@ func (ix *Index) rank(candidates []int, cleanQ string, q []string) {
 
 		if strings.Contains(normAlbum, cleanQ) {
 			titleScores[i] += 30
+		}
+
+		if titleScores[i] == 0 && len(cleanQ) >= 4 {
+			maxD := 1
+			if len(cleanQ) >= 8 {
+				maxD = 2
+			}
+			if d := damerauLevenshtein(cleanQ, normTitle, maxD); d <= maxD {
+				titleScores[i] += 150 - (d * 30)
+			} else if d := damerauLevenshtein(cleanQ, normArtist, maxD); d <= maxD {
+				titleScores[i] += 100 - (d * 20)
+			} else if d := damerauLevenshtein(cleanQ, normAlbum, maxD); d <= maxD {
+				titleScores[i] += 50 - (d * 10)
+			}
 		}
 
 		for _, tokens := range [][]string{ix.titleTokens[i], ix.titleForms[i]} {
@@ -587,13 +786,34 @@ func (ix *Index) findAlbums(cleanQ string, q []string, matchedTracks []int) []Al
 
 		allTokensMatch := true
 		for _, tk := range q {
-			if !strings.Contains(alb.normName+" "+alb.normArtist, tk) {
+			matched := strings.Contains(alb.normName+" "+alb.normArtist, tk)
+			if !matched {
+				if syns, ok := tokenSynonyms[tk]; ok {
+					for _, syn := range syns {
+						if strings.Contains(alb.normName+" "+alb.normArtist, syn) {
+							matched = true
+							break
+						}
+					}
+				}
+			}
+			if !matched {
 				allTokensMatch = false
 				break
 			}
 		}
 		if allTokensMatch && len(q) > 0 {
 			score += 250
+		}
+
+		if score == 0 && len(cleanQ) >= 4 {
+			maxD := 1
+			if len(cleanQ) >= 8 {
+				maxD = 2
+			}
+			if d := damerauLevenshtein(cleanQ, alb.normName, maxD); d <= maxD {
+				score += 300 - (d * 50)
+			}
 		}
 
 		// Match against album name or artist.
@@ -664,13 +884,34 @@ func (ix *Index) findArtists(cleanQ string, q []string, matchedTracks []int) []A
 
 		allTokensMatch := true
 		for _, tk := range q {
-			if !strings.Contains(art.normName, tk) {
+			matched := strings.Contains(art.normName, tk)
+			if !matched {
+				if syns, ok := tokenSynonyms[tk]; ok {
+					for _, syn := range syns {
+						if strings.Contains(art.normName, syn) {
+							matched = true
+							break
+						}
+					}
+				}
+			}
+			if !matched {
 				allTokensMatch = false
 				break
 			}
 		}
 		if allTokensMatch && len(q) > 0 {
 			score += 250
+		}
+
+		if score == 0 && len(cleanQ) >= 4 {
+			maxD := 1
+			if len(cleanQ) >= 8 {
+				maxD = 2
+			}
+			if d := damerauLevenshtein(cleanQ, art.normName, maxD); d <= maxD {
+				score += 300 - (d * 50)
+			}
 		}
 
 		// Match against artist name.

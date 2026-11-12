@@ -39,12 +39,14 @@ type Options struct {
 	Version  string
 	Log      *slog.Logger
 	Auth     *bitchordauth.Auth
+	ArtCache *ArtCache
 }
 
 type server struct {
 	Options
 	lookupTimeout time.Duration
 	auth          *bitchordauth.Auth
+	artCache      *ArtCache
 }
 
 // source is one server resolved from the request path, with the base of its
@@ -76,10 +78,15 @@ func newServer(o Options) *server {
 			Mode:  mode,
 		})
 	}
+	cache := o.ArtCache
+	if cache == nil {
+		cache = NewArtCache(defaultArtMaxItems, defaultArtMaxBytes)
+	}
 	return &server{
 		Options:       o,
 		lookupTimeout: 2500 * time.Millisecond,
 		auth:          auth,
+		artCache:      cache,
 	}
 }
 

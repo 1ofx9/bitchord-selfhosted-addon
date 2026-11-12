@@ -415,3 +415,137 @@ func TestMultiArtistGroupingInIndex(t *testing.T) {
 		t.Errorf("expected 'Gesaffelstein' for query 'gesaffelstein', got %+v", resGes.Artists)
 	}
 }
+
+func TestDamerauLevenshtein(t *testing.T) {
+	cases := []struct {
+		a, b    string
+		maxDist int
+		want    int
+	}{
+		{"", "", 2, 0},
+		{"a", "", 2, 1},
+		{"", "b", 2, 1},
+		{"coldplay", "coldplay", 2, 0},
+		{"coldpay", "coldplay", 2, 1},     // omission
+		{"coldplayy", "coldplay", 2, 1},   // insertion
+		{"koldplay", "coldplay", 2, 1},    // substitution
+		{"clodplay", "coldplay", 2, 1},    // transposition
+		{"bohemain", "bohemian", 2, 1},    // transposition
+		{"completely", "different", 1, 2}, // exceeded maxDist
+	}
+	for _, tc := range cases {
+		got := damerauLevenshtein(tc.a, tc.b, tc.maxDist)
+		if got != tc.want {
+			t.Errorf("damerauLevenshtein(%q, %q, %d) = %d, want %d", tc.a, tc.b, tc.maxDist, got, tc.want)
+		}
+	}
+}
+
+func TestSynonymExpansion(t *testing.T) {
+	ix := NewIndex([]media.Track{
+		{ID: "1", Title: "Star Wars: The Empire Strikes Back (Original Soundtrack)", Artist: "John Williams", Album: "Original Soundtrack"},
+		{ID: "2", Title: "Cyberpunk 2077 OST", Artist: "Marcin Przybyłowicz", Album: "Cyberpunk 2077 OST"},
+		{ID: "3", Title: "Guardians of the Galaxy: Awesome Mix Vol. 1", Artist: "Various Artists", Album: "Awesome Mix Vol. 1"},
+		{ID: "4", Title: "Classical Favorites Volume 2", Artist: "London Philharmonic", Album: "Classical Favorites Volume 2"},
+		{ID: "5", Title: "Shine On You Crazy Diamond (Pts. 1-5)", Artist: "Pink Floyd", Album: "Wish You Were Here"},
+		{ID: "6", Title: "Another Brick in the Wall (Part 2)", Artist: "Pink Floyd", Album: "The Wall"},
+		{ID: "7", Title: "Godzilla vs Kong", Artist: "Junkie XL", Album: "Battle of the Titans"},
+	})
+
+	// 1. "ost" matches "Original Soundtrack"
+	ostRes := ix.Find("star wars ost", 10)
+	if len(ostRes.Tracks) == 0 || ostRes.Tracks[0].ID != "1" {
+		t.Fatalf("search 'star wars ost' want ID 1, got %v", ids(ostRes.Tracks))
+	}
+
+	// 2. "soundtrack" matches "Cyberpunk 2077 OST"
+	stRes := ix.Find("cyberpunk soundtrack", 10)
+	if len(stRes.Tracks) == 0 || stRes.Tracks[0].ID != "2" {
+		t.Fatalf("search 'cyberpunk soundtrack' want ID 2, got %v", ids(stRes.Tracks))
+	}
+
+	// 3. "volume 1" matches "Awesome Mix Vol. 1"
+	volRes := ix.Find("awesome mix volume 1", 10)
+	if len(volRes.Tracks) == 0 || volRes.Tracks[0].ID != "3" {
+		t.Fatalf("search 'awesome mix volume 1' want ID 3, got %v", ids(volRes.Tracks))
+	}
+
+	// 4. "vol 2" matches "Volume 2"
+	vol2Res := ix.Find("classical favorites vol 2", 10)
+	if len(vol2Res.Tracks) == 0 || vol2Res.Tracks[0].ID != "4" {
+		t.Fatalf("search 'classical favorites vol 2' want ID 4, got %v", ids(vol2Res.Tracks))
+	}
+
+	// 5. "part 1" matches "Pts. 1-5"
+	ptRes := ix.Find("crazy diamond part 1", 10)
+	if len(ptRes.Tracks) == 0 || ptRes.Tracks[0].ID != "5" {
+		t.Fatalf("search 'crazy diamond part 1' want ID 5, got %v", ids(ptRes.Tracks))
+	}
+
+	// 6. "pt 2" matches "Part 2"
+	pt2Res := ix.Find("another brick pt 2", 10)
+	if len(pt2Res.Tracks) == 0 || pt2Res.Tracks[0].ID != "6" {
+		t.Fatalf("search 'another brick pt 2' want ID 6, got %v", ids(pt2Res.Tracks))
+	}
+
+	// 7. "versus" matches "vs"
+	vsRes := ix.Find("godzilla versus kong", 10)
+	if len(vsRes.Tracks) == 0 || vsRes.Tracks[0].ID != "7" {
+		t.Fatalf("search 'godzilla versus kong' want ID 7, got %v", ids(vsRes.Tracks))
+	}
+}
+
+func TestFuzzyTypoSearch(t *testing.T) {
+	ix := NewIndex([]media.Track{
+		{ID: "1", Title: "Yellow", Artist: "Coldplay", Album: "Parachutes"},
+		{ID: "2", Title: "Creep", Artist: "Radiohead", Album: "Pablo Honey"},
+		{ID: "3", Title: "Bohemian Rhapsody", Artist: "Queen", Album: "A Night at the Opera"},
+		{ID: "4", Title: "HUMBLE.", Artist: "Kendrick Lamar", Album: "DAMN."},
+	})
+
+	// 1. Single token typo: "coldpay" -> finds "Coldplay" track & artist
+	res1 := ix.Find("coldpay", 10)
+	if len(res1.Tracks) == 0 || res1.Tracks[0].ID != "1" {
+		t.Fatalf("search 'coldpay' want track ID 1, got %v", ids(res1.Tracks))
+	}
+	if len(res1.Artists) == 0 || res1.Artists[0].Name != "Coldplay" {
+		t.Fatalf("search 'coldpay' want artist Coldplay, got %+v", res1.Artists)
+	}
+
+	// 2. Multi-word typo: "radiohed creep" -> finds "Radiohead - Creep"
+	res2 := ix.Find("radiohed creep", 10)
+	if len(res2.Tracks) == 0 || res2.Tracks[0].ID != "2" {
+		t.Fatalf("search 'radiohed creep' want track ID 2, got %v", ids(res2.Tracks))
+	}
+
+	// 3. Adjacent transposition: "bohemain" -> finds "Bohemian Rhapsody"
+	res3 := ix.Find("bohemain", 10)
+	if len(res3.Tracks) == 0 || res3.Tracks[0].ID != "3" {
+		t.Fatalf("search 'bohemain' want track ID 3, got %v", ids(res3.Tracks))
+	}
+
+	// 4. Typo in artist name: "kendrick lamr" -> finds "HUMBLE."
+	res4 := ix.Find("kendrick lamr", 10)
+	if len(res4.Tracks) == 0 || res4.Tracks[0].ID != "4" {
+		t.Fatalf("search 'kendrick lamr' want track ID 4, got %v", ids(res4.Tracks))
+	}
+
+	// 5. Typo in album search: "parachuts" -> finds "Parachutes" album
+	res5 := ix.Find("parachuts", 10)
+	foundAlb := false
+	for _, alb := range res5.Albums {
+		if alb.Name == "Parachutes" {
+			foundAlb = true
+			break
+		}
+	}
+	if !foundAlb {
+		t.Fatalf("search 'parachuts' want album Parachutes, got %+v", res5.Albums)
+	}
+
+	// 6. Very short non-matching word does not trigger false positive
+	res6 := ix.Find("zzz", 10)
+	if len(res6.Tracks) != 0 {
+		t.Fatalf("search 'zzz' should return 0 tracks, got %v", ids(res6.Tracks))
+	}
+}
